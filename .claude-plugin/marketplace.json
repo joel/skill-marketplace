@@ -1,0 +1,9 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "joel-skills",
+  "description": "Joel's personal Claude Code plugin marketplace — reusable skills distributed as plugins, kept out of the repositories they apply to.",
+  "owner": {
+    "name": "Joel Azemar"
+  },
+  "plugins": []
+}
