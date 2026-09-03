@@ -5,5 +5,21 @@
   "owner": {
     "name": "Joel Azemar"
   },
-  "plugins": []
+  "plugins": [
+    {
+      "name": "project-agent-workspace",
+      "description": "Initialise, adopt, maintain, audit, or hand over a vendor-neutral project workspace for one or more AI agents: portable task, state, decision, session, approval, and hand-off records that survive switching providers.",
+      "author": {
+        "name": "Joel Azemar"
+      },
+      "category": "workflow",
+      "version": "1.0.0",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/joel/skill-marketplace.git",
+        "path": "plugins/project-agent-workspace",
+        "ref": "main"
+      }
+    }
+  ]
 }
