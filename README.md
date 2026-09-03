@@ -24,10 +24,9 @@ Plugins install at **user scope** (`~/.claude/plugins/`). Nothing is added to
 any project repository. Each skill carries its own scope guard in its
 `description` so it stays silent in repositories it does not apply to.
 
-If this repository is **private**, the normal GitHub credentials are used
-(`gh auth login` or SSH). If a background marketplace refresh ever fails on
-credentials, a manual `/plugin marketplace update joel-skills` inside a session
-always works.
+This repository is **public**, so no credentials are needed to install. If a
+background marketplace refresh ever fails, a manual
+`/plugin marketplace update joel-skills` inside a session always works.
 
 ## Getting updates
 
