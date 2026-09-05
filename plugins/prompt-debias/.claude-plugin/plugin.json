@@ -1,0 +1,16 @@
+{
+  "name": "prompt-debias",
+  "description": "Rewrite a draft prompt before sending it so the answering model tests the asker's frames instead of inheriting them: inventories every injected frame, keeps real constraints and evidence, quarantines the rest as hypotheses, states the question neutrally, and adds instructions that force competing framings and odds-backed conclusions. Returns the rewritten prompt plus a table of what changed.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Joel Azemar"
+  },
+  "repository": "https://github.com/joel/skill-marketplace",
+  "keywords": [
+    "prompting",
+    "debias",
+    "sycophancy",
+    "framing",
+    "critical-thinking"
+  ]
+}
