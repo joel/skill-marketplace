@@ -1,0 +1,16 @@
+{
+  "name": "execution-plan",
+  "description": "Drive the end-to-end execution of any coherent piece of code work in a GitHub-hosted project: size-scaled design pass, issue, Kanban, branch, implement, internal code and security review loops, validation gates, atomic commits, live verification, PR, automated-reviewer loop, review-thread triage, merge per project policy, optional release, and persisting what was learned. Project-specific values come from the project's own workflow doc.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Joel Azemar"
+  },
+  "repository": "https://github.com/joel/skill-marketplace",
+  "keywords": [
+    "workflow",
+    "github",
+    "pull-request",
+    "code-review",
+    "lifecycle"
+  ]
+}

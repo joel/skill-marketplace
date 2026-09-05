@@ -20,6 +20,36 @@
         "path": "plugins/project-agent-workspace",
         "ref": "main"
       }
+    },
+    {
+      "name": "execution-plan",
+      "description": "Drive the end-to-end execution of any coherent piece of code work in a GitHub-hosted project: size-scaled design pass, issue, Kanban, branch, implement, internal code and security review loops, validation gates, atomic commits, live verification, PR, automated-reviewer loop, review-thread triage, merge per project policy, optional release, and persisting what was learned. Project-specific values come from the project's own workflow doc.",
+      "author": {
+        "name": "Joel Azemar"
+      },
+      "category": "workflow",
+      "version": "1.0.0",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/joel/skill-marketplace.git",
+        "path": "plugins/execution-plan",
+        "ref": "main"
+      }
+    },
+    {
+      "name": "prompt-debias",
+      "description": "Rewrite a draft prompt before sending it so the answering model tests the asker's frames instead of inheriting them: inventories every injected frame, keeps real constraints and evidence, quarantines the rest as hypotheses, states the question neutrally, and adds instructions that force competing framings and odds-backed conclusions. Returns the rewritten prompt plus a table of what changed.",
+      "author": {
+        "name": "Joel Azemar"
+      },
+      "category": "prompting",
+      "version": "1.0.0",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/joel/skill-marketplace.git",
+        "path": "plugins/prompt-debias",
+        "ref": "main"
+      }
     }
   ]
 }
