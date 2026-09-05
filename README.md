@@ -10,6 +10,7 @@ Marketplace name: `joel-skills`. Catalog: `.claude-plugin/marketplace.json`.
 | Plugin | What it does |
 |--------|--------------|
 | `project-agent-workspace` | Initialise, adopt, maintain, audit, or hand over a vendor-neutral project workspace for one or more AI agents. Makes the workspace files, not chat history or model memory, the durable system of record: task, state, decision, session, approval, and hand-off records that survive switching providers. Ships a template, a standard, and Python scripts to create and validate a workspace. |
+| `execution-plan` | Drives any piece of code work through a full lifecycle: size-scaled design pass, GitHub issue, Kanban, branch, implement, seed data, internal code and security review loops, validation gates, atomic commits, live verification in a real browser, docs and diagrams, PR, automated-reviewer loop, review-thread triage, merge per project policy, optional release, and persisting what was learned. Generic: each project supplies its own repo, board, commands, gates, reviewer bot, and merge policy through its workflow doc. |
 
 ## Installation (one-time, per machine)
 
