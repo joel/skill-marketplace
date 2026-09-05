@@ -9,7 +9,7 @@ Marketplace name: `joel-skills`. Catalog: `.claude-plugin/marketplace.json`.
 
 | Plugin | What it does |
 |--------|--------------|
-| _(none yet)_ | Skills are added one at a time. See [Adding a new skill/plugin](#adding-a-new-skillplugin). |
+| `project-agent-workspace` | Initialise, adopt, maintain, audit, or hand over a vendor-neutral project workspace for one or more AI agents. Makes the workspace files, not chat history or model memory, the durable system of record: task, state, decision, session, approval, and hand-off records that survive switching providers. Ships a template, a standard, and Python scripts to create and validate a workspace. |
 
 ## Installation (one-time, per machine)
 

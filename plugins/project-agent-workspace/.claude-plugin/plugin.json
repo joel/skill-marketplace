@@ -1,0 +1,16 @@
+{
+  "name": "project-agent-workspace",
+  "description": "Initialise, adopt, maintain, audit, or hand over a vendor-neutral project workspace for one or more AI agents: portable task, state, decision, session, approval, and hand-off records that survive switching providers.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Joel Azemar"
+  },
+  "repository": "https://github.com/joel/skill-marketplace",
+  "keywords": [
+    "agents",
+    "workspace",
+    "project-management",
+    "handoff",
+    "vendor-neutral"
+  ]
+}
