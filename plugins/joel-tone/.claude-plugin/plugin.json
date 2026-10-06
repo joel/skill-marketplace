@@ -1,0 +1,16 @@
+{
+  "name": "joel-tone",
+  "description": "Rewrite drafts, articles, emails, Slack messages, proposals, or LLM-generated copy into Joel Azemar's voice so it reads human, not AI-generated: picks the register (public company copy or Joel's own messages), enforces the no-dash and no-invented-facts rules, cuts hedges and empty intensifiers, and returns paste-ready text plus a short note of what changed.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Joel Azemar"
+  },
+  "repository": "https://github.com/joel/skill-marketplace",
+  "keywords": [
+    "writing",
+    "tone",
+    "voice",
+    "copywriting",
+    "rewrite"
+  ]
+}
