@@ -50,6 +50,21 @@
         "path": "plugins/prompt-debias",
         "ref": "main"
       }
+    },
+    {
+      "name": "joel-tone",
+      "description": "Rewrite drafts, articles, emails, Slack messages, proposals, or LLM-generated copy into Joel Azemar's voice so it reads human, not AI-generated: picks the register (public company copy or Joel's own messages), enforces the no-dash and no-invented-facts rules, cuts hedges and empty intensifiers, and returns paste-ready text plus a short note of what changed.",
+      "author": {
+        "name": "Joel Azemar"
+      },
+      "category": "writing",
+      "version": "0.1.0",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/joel/skill-marketplace.git",
+        "path": "plugins/joel-tone",
+        "ref": "main"
+      }
     }
   ]
 }
