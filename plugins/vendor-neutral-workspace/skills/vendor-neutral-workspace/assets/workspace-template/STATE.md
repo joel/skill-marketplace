@@ -18,3 +18,4 @@
 ## Risks and blockers
 
 - Initial project facts remain unknown.
+- Tool and data access have not been granted.

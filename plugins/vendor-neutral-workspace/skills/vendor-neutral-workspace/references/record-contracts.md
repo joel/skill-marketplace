@@ -16,6 +16,7 @@ Use these contracts when creating or repairing durable workspace records. Adapt 
 - Requested-by: <identity or source>
 - Depends-on: <IDs or none>
 - Approval: not-required | required | requested | approved | rejected
+- Approval-packet: <path under approvals/ or none>
 - Evidence: <paths, links, or none-yet>
 
 #### Objective
@@ -109,30 +110,11 @@ Never delete a superseded decision; link its replacement.
 
 ## Hand-off
 
-```markdown
-# Hand-off — <task IDs>
-
-- From: <agent-id>
-- To: <agent-id>
-- At: <ISO 8601 timestamp>
-- Status: offered | acknowledged | rejected | completed
-
-## Requested outcome
-
-## Context and completed work
-
-## Files and evidence
-
-## Unresolved questions
-
-## Authority and approval state
-
-## Next action
-```
-
-The recipient acknowledges by updating the hand-off or linked task. A hand-off does not transfer authority that the sender did not possess.
+In the single-agent layout a hand-off is the `## Handoff` section of the closing session record together with current `STATE.md`; there is no separate file. A hand-off between two agents uses the contract in [the multi-agent extension](multi-agent-extension.md).
 
 ## Approval packet
+
+Store each packet as `approvals/<task-id>-<YYYY-MM-DD>.md` and link it from the task's `Approval-packet` field.
 
 ```markdown
 # Approval request — <task ID>

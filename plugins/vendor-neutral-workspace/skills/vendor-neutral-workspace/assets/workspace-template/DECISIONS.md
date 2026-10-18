@@ -1,4 +1,4 @@
-# Project decisions — {{PROJECT_NAME}}
+# Decisions — {{PROJECT_NAME}}
 
 ## DEC-0001 — Use a vendor-neutral agent workspace
 
@@ -22,7 +22,7 @@ Use this file-backed workspace as the durable system of record.
 
 - Human-readable, portable state and history
 - Explicit task ownership and approval boundaries
-- Recoverable hand-offs between compatible agents
+- Recoverable hand-offs between sessions, machines, and harnesses
 
 ### Alternatives considered
 
@@ -35,5 +35,5 @@ Use this file-backed workspace as the durable system of record.
 
 ### Evidence
 
-- AGENTS.md
-- agents/{{AGENT_ID}}/WARM_ME_UP.md
+- AGENTS.md (operating rules and boot sequence)
+- README.md
