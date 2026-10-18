@@ -4,6 +4,7 @@ validator's cross-checks between workspace.yaml and the files on disk.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -14,8 +15,8 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = PLUGIN_ROOT / "skills" / "vendor-neutral-workspace" / "scripts"
 
 
-def run(script: str, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run([sys.executable, str(SCRIPTS / script), *args], capture_output=True, text=True)
+def run(script: str, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run([sys.executable, str(SCRIPTS / script), *args], capture_output=True, text=True, env=env)
 
 
 class MarkdownBackend(unittest.TestCase):
@@ -65,13 +66,14 @@ class MarkdownBackend(unittest.TestCase):
         self.assertIn("ERROR workspace.yaml: tasks must be one of markdown, beads (got jira)", self.validate())
 
 
-class BeadsNotYetSupported(unittest.TestCase):
-    def test_beads_flag_exits_with_a_message_and_creates_nothing(self) -> None:
+class BeadsWithoutBd(unittest.TestCase):
+    def test_beads_flag_without_bd_on_path_exits_and_creates_nothing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "workspace"
-            result = run("init_workspace.py", "--root", str(root), "--project", "Beads", "--tasks", "beads", "--apply")
-            self.assertEqual(result.returncode, 2)
-            self.assertIn("not yet supported", result.stderr)
+            env = {**os.environ, "PATH": "/nonexistent"}  # sys.executable is absolute, bd is not found
+            result = run("init_workspace.py", "--root", str(root), "--project", "Beads", "--tasks", "beads", "--apply", env=env)
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("needs `bd` on PATH", result.stderr)
             self.assertFalse(root.exists())
 
 

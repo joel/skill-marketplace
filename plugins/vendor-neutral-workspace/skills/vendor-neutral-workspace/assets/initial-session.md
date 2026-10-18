@@ -4,7 +4,7 @@
 - Runtime: unknown
 - Started: {{TIMESTAMP}}
 - Ended: {{TIMESTAMP}}
-- Tasks: SETUP-0001
+- Tasks: {{INITIAL_TASK_ID}}
 
 ## Objective
 
@@ -47,7 +47,7 @@ None.
 
 ## Memory-bank and task updates
 
-- Created `SETUP-0001` and assigned it to {{AGENT_ID}}.
+- Created `{{INITIAL_TASK_ID}}` in the {{TASK_BACKEND}} task backend and assigned it to {{AGENT_ID}}.
 
 ## Handoff
 
