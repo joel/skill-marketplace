@@ -8,12 +8,12 @@
   "plugins": [
     {
       "name": "vendor-neutral-workspace",
-      "description": "Initialise, adopt, maintain, audit, or hand over a vendor-neutral workspace: the repository's files, not any provider's chat history or hidden memory, are the durable record of an AI agent's work, so the same subject resumes from another machine or another harness. Ships the standard, a template, and scripts to create and validate a workspace.",
+      "description": "Initialise, adopt, maintain, audit, or hand over a vendor-neutral workspace: the repository's files, not any provider's chat history or hidden memory, are the durable record of an AI agent's work, so the same subject resumes from another machine or another harness. Memory Bank context files, MADR decision records, a Markdown or Beads task backend declared in workspace.yaml, session records and approval packets. Ships the standard, a template, scripts to create, validate and migrate a workspace, and Claude Code hooks that enforce the session record.",
       "author": {
         "name": "Joel Azemar"
       },
       "category": "workflow",
-      "version": "1.1.0",
+      "version": "2.0.0",
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/joel/skill-marketplace.git",
