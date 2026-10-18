@@ -1,0 +1,17 @@
+{
+  "name": "vendor-neutral-workspace",
+  "description": "Initialise, adopt, maintain, audit, or hand over a vendor-neutral workspace: the repository's files, not any provider's chat history or hidden memory, are the durable record of an AI agent's work, so the same subject resumes from another machine or another harness. Ships the standard, a template, and scripts to create and validate a workspace.",
+  "version": "1.1.0",
+  "author": {
+    "name": "Joel Azemar"
+  },
+  "repository": "https://github.com/joel/skill-marketplace",
+  "keywords": [
+    "agents",
+    "workspace",
+    "vendor-neutral",
+    "continuity",
+    "portability",
+    "handoff"
+  ]
+}
