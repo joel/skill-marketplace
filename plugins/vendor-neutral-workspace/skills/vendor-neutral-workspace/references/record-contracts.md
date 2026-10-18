@@ -82,31 +82,17 @@ After closure, append dated corrections rather than silently rewriting history.
 
 ## Decision
 
-```markdown
-## <DECISION-ID> — <Title>
+Decisions are decision records (ADRs) in `docs/decisions/`, one file per decision, in [MADR 4.0.0](https://adr.github.io/madr/) form. Copy `docs/decisions/adr-template.md` (the MADR 4.0.0 full template, CC0), remove the optional sections you do not need, and keep the mandatory ones: title, Context and Problem Statement, Considered Options, Decision Outcome.
 
-- Date: <YYYY-MM-DD>
-- Status: proposed | active | rejected | superseded
-- Owner: <identity>
-- Approver: <identity or not-required>
-- Supersedes: <ID or none>
-- Superseded-by: <ID or none>
-- Review: <date or trigger>
+Rules:
 
-### Context
+- Filename `NNNN-title-with-dashes.md`: four digits, monotonic, never reused; a new record takes the next free number. Add a row to `docs/decisions/README.md`.
+- Front matter `status` is exactly one of `proposed | rejected | accepted | deprecated | superseded by ADR-NNNN`, quoted. `date` is the day of the last status change. `decision-makers` names who decided, including the approver; `consulted` and `informed` are optional.
+- An accepted record is immutable except its `status` and one line under More Information naming the record that replaced it. To change your mind, write a new record and set the old one to `superseded by ADR-NNNN`. Never delete a record.
+- Write a record when a change makes a choice that someone could later undo without knowing why it was made: significant, hard to reverse, cross-cutting, surprising, or a trade-off between real alternatives. Do not write one for a tiny or local choice, a temporary workaround, or something already covered by `POLICIES.md` (a rule) or `TASKS.md` (work).
+- A record states one decision, not a design guide or a policy. Keep it to a page; if the title needs an "and", it is two records. Give real alternatives, not a dummy one.
 
-### Decision
-
-### Reasons
-
-### Alternatives considered
-
-### Consequences and risks
-
-### Evidence
-```
-
-Never delete a superseded decision; link its replacement.
+Mapping from the v1 `DECISIONS.md` contract: Owner and Approver → `decision-makers` (or `consulted` when they only advised); Review → More Information ("revisit when ..."); Context → Context and Problem Statement; Decision and Reasons → Decision Outcome; Alternatives considered → Considered Options and Pros and Cons of the Options; Consequences and risks → Consequences; Evidence → Confirmation and More Information; Supersedes and Superseded-by → the old record's `status` and one line in the new record's More Information.
 
 ## Hand-off
 

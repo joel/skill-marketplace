@@ -16,7 +16,7 @@ This workspace is the durable system of record. Do not rely on provider memory f
 1. Read this file.
 2. Read `ABOUT.md` and `STATE.md`.
 3. Read `POLICIES.md`.
-4. Read `DECISIONS.md`.
+4. Read `docs/decisions/README.md`; open only the accepted records relevant to the task.
 5. Read `TASKS.md`; confirm the task's owner, acceptance criteria, dependencies, blockers, and approval state.
 6. Read the current monthly summary in `summaries/monthly/`, when one exists.
 7. Read the latest session record in `sessions/`; follow its Handoff to earlier records only when it points there.
@@ -28,7 +28,7 @@ Do not trust remembered information unless it is verified against the workspace 
 
 - Keep `STATE.md` concise and current; keep actionable work in `TASKS.md`, one accountable owner per task. Do not silently take ownership or discard concurrent work.
 - Record facts, inferences, assumptions, proposals, decisions, and approvals as distinct categories, and link material claims to evidence.
-- Record durable decisions in `DECISIONS.md`. Never delete a superseded decision; link its replacement.
+- Decisions live in `docs/decisions/` as decision records. Accepted records are binding; proposed records are non-binding context; superseded records are history. If a task conflicts with an accepted record, stop and propose a change to the task or the record rather than working around it. Propose a new record when a change introduces or revises a durable decision, that is, a choice someone could later undo without knowing why it was made. State each rule once, in the record that owns it, and reference it elsewhere.
 - Request approval immediately before any consequential external action unless `POLICIES.md` explicitly grants the authority. Write the request as an approval packet in `approvals/` and link it from the task.
 - Never store secret values here; store only references to externally managed secrets.
 - Durable procedures belong in the harness's skill directory, never in this workspace. This workspace holds live project facts.
@@ -36,6 +36,6 @@ Do not trust remembered information unless it is verified against the workspace 
 ## Before ending
 
 1. Verify outputs against the task's acceptance criteria.
-2. Update `STATE.md`, `TASKS.md`, and `DECISIONS.md` as needed.
+2. Update `STATE.md`, `TASKS.md`, and any decision records under `docs/decisions/` as needed.
 3. In the session record, note files changed, external actions, approvals, blockers, and a concrete hand-off for the next session, then close it. Closed session records are append-only: add dated corrections rather than rewriting.
 4. Produce any due summary by synthesis, not concatenation.

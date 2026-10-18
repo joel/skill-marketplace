@@ -23,7 +23,10 @@ Use this reference when establishing, adopting, auditing, or materially changing
 ├── ABOUT.md
 ├── STATE.md
 ├── TASKS.md
-├── DECISIONS.md
+├── docs/decisions/
+│   ├── README.md
+│   ├── adr-template.md
+│   └── NNNN-title.md
 ├── approvals/
 ├── sessions/YYYY/MM/
 ├── summaries/{weekly,monthly,yearly}/
@@ -43,7 +46,7 @@ One agent, identified in `AGENTS.md`, owns this layout. Add `PEOPLE.md`, `SYSTEM
 | `ABOUT.md` | Stable project identity, scope, outcomes | Mutable with review |
 | `STATE.md` | Concise current situation and priorities | Continuously maintained |
 | `TASKS.md` | Actionable work, one owner each | Continuously maintained |
-| `DECISIONS.md` | Durable decisions; superseded ones kept and linked | Append or supersede |
+| `docs/decisions/` | One MADR record per durable decision, plus `README.md` index and `adr-template.md` | New record or status change; accepted records otherwise immutable |
 | `approvals/` | One packet per approval request | Append-only once decided |
 | `sessions/YYYY/MM/` | One record per working session | Append-only once closed |
 | `summaries/` | Weekly, monthly, yearly syntheses | Append or regenerate |
@@ -59,7 +62,7 @@ Each fact lives once and is referenced from elsewhere. Do not maintain subtly di
 1. Read `AGENTS.md`.
 2. Read `ABOUT.md` and `STATE.md`.
 3. Read `POLICIES.md`.
-4. Read `DECISIONS.md`.
+4. Read `docs/decisions/README.md`; open only the accepted records relevant to the task.
 5. Read `TASKS.md`; confirm the task's owner, acceptance criteria, dependencies, blockers, and approval state.
 6. Read the current monthly summary, when one exists.
 7. Read the latest session record; follow its Handoff to earlier records only when it points there. Reading all history is a boot-budget failure, not diligence.
@@ -83,6 +86,10 @@ Material work should distinguish:
 - **approval:** permission for a specific consequential action.
 
 Link tasks, decisions, sessions, approvals, and artifacts so a reviewer can trace important outcomes. Preserve source originals and document transformations when practical.
+
+## Decisions
+
+Durable decisions are decision records in `docs/decisions/`, one file per decision in MADR 4.0.0 form, indexed by `docs/decisions/README.md`. Accepted records are binding; proposed records are non-binding context; superseded and deprecated records are history. An agent that finds a task in conflict with an accepted record stops and proposes a change to the task or the record instead of working around it. The record contracts give the filename rule, the status vocabulary, the immutability rule, and the test for what deserves a record.
 
 ## Concurrency
 
