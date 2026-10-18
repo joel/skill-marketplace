@@ -21,6 +21,14 @@ for dir in plugins/*/; do
   fi
   claude plugin validate "$dir" || fail=1
 
+  if [ -f "${dir}hooks/hooks.json" ]; then
+    if python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert isinstance(d.get("hooks"), dict), "top-level hooks key missing"' "${dir}hooks/hooks.json"; then
+      echo "   hooks.json OK"
+    else
+      echo "   INVALID hooks/hooks.json"; fail=1
+    fi
+  fi
+
   if [ -d "${dir}tests" ]; then
     echo "   tests"
     python3 -m unittest discover -s "${dir}tests" -q || fail=1
