@@ -36,7 +36,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True, type=Path, help="Target project directory")
     parser.add_argument("--project", required=True, help="Human-readable project name")
-    parser.add_argument("--agent-id", default="chief", help="Stable lowercase agent ID")
+    parser.add_argument("--agent-id", default="main", help="Stable lowercase agent ID")
     parser.add_argument("--agent-name", default=None, help="Human-readable agent name")
     parser.add_argument("--role", default="Coordinator", help="Initial agent role")
     parser.add_argument("--apply", action="store_true", help="Create missing paths; default is preview")

@@ -35,8 +35,8 @@ When Python 3 is available, preview deterministic creation with:
 python3 scripts/init_workspace.py \
   --root /path/to/project \
   --project "Project name" \
-  --agent-id chief \
-  --agent-name "Chief"
+  --agent-id main \
+  --agent-name "Main"
 ```
 
 Review the preview, then repeat with `--apply`. The script creates missing files and directories only; it does not move or overwrite existing content. If scripts cannot run, copy and customise `assets/workspace-template/` manually using the standard.
