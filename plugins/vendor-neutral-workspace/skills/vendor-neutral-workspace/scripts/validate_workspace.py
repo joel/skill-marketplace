@@ -15,10 +15,11 @@ ROOT_FILES = (
     "ABOUT.md",
     "STATE.md",
     "TASKS.md",
-    "DECISIONS.md",
+    "docs/decisions/README.md",
 )
 
 ROOT_DIRS = (
+    "docs/decisions",
     "approvals",
     "sessions",
     "summaries/weekly",
@@ -30,6 +31,55 @@ ROOT_DIRS = (
 
 SESSION_GLOB = "[0-9][0-9][0-9][0-9]/[0-9][0-9]/*-session.md"
 AGENT_ID_PATTERN = r"[a-z0-9]+(?:-[a-z0-9]+)*"
+
+ADR_DIR = "docs/decisions"
+ADR_INDEX = "README.md"
+ADR_TEMPLATE = "adr-template.md"
+ADR_FILENAME = re.compile(r"(?P<number>\d{4})-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md")
+ADR_STATUSES = ("proposed", "rejected", "accepted", "deprecated")
+ADR_SUPERSEDED = re.compile(r"superseded by ADR-\d{4}")
+
+
+def check_decisions(root: Path, errors: list[str], warnings: list[str]) -> None:
+    """MADR records: filename, front matter, status vocabulary, unique numbers, index."""
+    directory = root / ADR_DIR
+    if not directory.is_dir():
+        return
+    index_path = directory / ADR_INDEX
+    index = index_path.read_text(encoding="utf-8", errors="replace") if index_path.is_file() else ""
+    by_number: dict[str, list[str]] = {}
+
+    for path in sorted(directory.glob("*.md")):
+        if path.name in (ADR_INDEX, ADR_TEMPLATE):
+            continue
+        relative = f"{ADR_DIR}/{path.name}"
+        match = ADR_FILENAME.fullmatch(path.name)
+        if not match:
+            errors.append(f"bad ADR filename: {relative}")
+            continue
+        by_number.setdefault(match.group("number"), []).append(path.name)
+
+        content = path.read_text(encoding="utf-8", errors="replace")
+        front_matter = re.match(r"\A---\n(.*?)\n---\n", content, re.DOTALL)
+        if not front_matter:
+            errors.append(f"ADR missing front matter: {relative}")
+        else:
+            status = re.search(r"^status:\s*\"?([^\"\n]*?)\"?\s*$", front_matter.group(1), re.MULTILINE)
+            if not status:
+                errors.append(f"ADR status missing: {relative}")
+            elif status.group(1) not in ADR_STATUSES and not ADR_SUPERSEDED.fullmatch(status.group(1)):
+                errors.append(f"ADR status not in vocabulary: {relative} ({status.group(1)})")
+
+        if index and path.name not in index:
+            warnings.append(f"ADR index drift: {path.name} not listed in {ADR_DIR}/{ADR_INDEX}")
+
+    for number, names in sorted(by_number.items()):
+        if len(names) > 1:
+            errors.append(f"duplicate ADR number {number}: {', '.join(names)}")
+
+    for listed in sorted(set(re.findall(r"\d{4}-[a-z0-9-]+\.md", index))):
+        if not (directory / listed).is_file():
+            warnings.append(f"ADR index drift: {ADR_DIR}/{ADR_INDEX} lists {listed} which does not exist")
 
 
 def main() -> int:
@@ -56,6 +106,8 @@ def main() -> int:
             errors.append("AGENTS.md lacks an '## Agent' block with a 'Stable ID' line")
         elif not re.fullmatch(AGENT_ID_PATTERN, match.group(1)):
             warnings.append(f"non-portable agent id in AGENTS.md: {match.group(1)}")
+
+    check_decisions(root, errors, warnings)
 
     sessions_root = root / "sessions"
     if sessions_root.is_dir() and not list(sessions_root.glob(SESSION_GLOB)):

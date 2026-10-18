@@ -20,6 +20,21 @@ EMPTY_DIRS = (
     "summaries/yearly",
 )
 
+ADR_DIR = Path("docs/decisions")
+ADR_FILENAME = re.compile(r"(?P<number>\d{4})-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md")
+
+
+def existing_adrs(directory: Path) -> dict[str, tuple[int, str]]:
+    """slug -> (number, filename) for every decision record already in the target."""
+    if not directory.is_dir():
+        return {}
+    found: dict[str, tuple[int, str]] = {}
+    for path in sorted(directory.iterdir()):
+        match = ADR_FILENAME.fullmatch(path.name)
+        if match:
+            found.setdefault(match.group("slug"), (int(match.group("number")), path.name))
+    return found
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -73,11 +88,30 @@ def main() -> int:
         print("error: --project cannot be empty", file=sys.stderr)
         return 2
 
+    # Decision records: a template record whose slug already exists in the target
+    # maps to that file (and is skipped), so re-running init never duplicates it;
+    # new records take consecutive next-free numbers, so adopting a project that
+    # already has ADRs never collides with the template's numbering.
+    present = existing_adrs(root / ADR_DIR)
+    next_free = max((number for number, _ in present.values()), default=0) + 1
     file_actions: list[tuple[Path, Path]] = []
     for source in sorted(template_root.rglob("*")):
         if not source.is_file():
             continue
-        file_actions.append((source, root / source.relative_to(template_root)))
+        relative = source.relative_to(template_root)
+        match = ADR_FILENAME.fullmatch(source.name) if relative.parent == ADR_DIR else None
+        if match:
+            template_number = int(match.group("number"))
+            slug = match.group("slug")
+            if slug in present:
+                number, target_name = present[slug]
+            else:
+                number, target_name = next_free, f"{next_free:04d}-{slug}.md"
+                next_free += 1
+            values[f"ADR_{template_number:04d}_ID"] = f"ADR-{number:04d}"
+            values[f"ADR_{template_number:04d}_FILE"] = target_name
+            relative = relative.with_name(target_name)
+        file_actions.append((source, root / relative))
 
     initial_session = template_root.parent / "initial-session.md"
     session_name = now.strftime("%d-%H%M%SZ-session.md")

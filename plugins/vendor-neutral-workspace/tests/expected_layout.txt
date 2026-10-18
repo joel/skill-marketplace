@@ -1,6 +1,5 @@
 ABOUT.md
 AGENTS.md
-DECISIONS.md
 POLICIES.md
 README.md
 STATE.md
@@ -8,6 +7,11 @@ TASKS.md
 approvals
 archive
 artifacts
+docs
+docs/decisions
+docs/decisions/NNNN-title.md
+docs/decisions/README.md
+docs/decisions/adr-template.md
 sessions
 sessions/YYYY
 sessions/YYYY/MM
