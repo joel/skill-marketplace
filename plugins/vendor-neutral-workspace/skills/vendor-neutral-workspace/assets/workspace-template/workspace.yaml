@@ -1,0 +1,6 @@
+# Machine-readable facts about this workspace, one flat key per line.
+# Tooling reads this file; the decision records in docs/decisions/ explain it.
+schema: 2
+agent: {{AGENT_ID}}
+tasks: {{TASK_BACKEND}}
+hooks: on

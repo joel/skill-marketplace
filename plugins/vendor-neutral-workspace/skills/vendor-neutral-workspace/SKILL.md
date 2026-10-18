@@ -26,7 +26,7 @@ Make the workspace—not proprietary chat history or hidden model memory—the d
 - **Scale:** Add further agents only when recurring ownership, specialised capability, permission isolation, parallel work, or a distinct audit trail justifies it; the default is one agent.
 - **Audit or hand over:** Check structural integrity, stale state, unclear ownership, missing evidence, and whether a fresh provider can resume from the files alone.
 
-Read [the workspace standard](references/workspace-standard.md) for initialise, adopt, scale, audit, or policy decisions. Read [the record contracts](references/record-contracts.md) when creating or repairing task, decision, session, approval, or summary records. Read [the multi-agent extension](references/multi-agent-extension.md) only when more than one persistent agent is justified.
+Read [the workspace standard](references/workspace-standard.md) for initialise, adopt, scale, audit, or policy decisions. Read [the record contracts](references/record-contracts.md) when creating or repairing task, decision, session, approval, or summary records. Read [the task backends](references/task-backends.md) when choosing or operating the task backend. Read [the multi-agent extension](references/multi-agent-extension.md) only when more than one persistent agent is justified.
 
 ## Initialise or adopt
 
@@ -36,7 +36,7 @@ Read [the workspace standard](references/workspace-standard.md) for initialise, 
 4. For a populated target, present the proposed mapping and risks before relocating, renaming, deleting, or overwriting anything.
 5. Create only missing structure. Preserve unrelated content and never silently replace an existing file.
 6. Populate files with actual project facts or clearly marked `unknown` items. Never turn guesses into durable facts.
-7. Record the agent's identity in `AGENTS.md`, create an initial task, record the initialisation session, and state the next action.
+7. Choose the task backend (`--tasks`, default `markdown`; propose `beads` when `bd` is on PATH and the project needs computed ready-work or atomic claims), record the agent's identity in `AGENTS.md`, create an initial task, record the initialisation session, and state the next action.
 
 When Python 3 is available, preview deterministic creation with:
 
@@ -45,7 +45,8 @@ python3 scripts/init_workspace.py \
   --root /path/to/project \
   --project "Project name" \
   --agent-id main \
-  --agent-name "Main"
+  --agent-name "Main" \
+  --tasks markdown
 ```
 
 Review the preview, then repeat with `--apply`. The script creates missing files and directories only; it does not move or overwrite existing content. If scripts cannot run, copy and customise `assets/workspace-template/` manually using the standard.
@@ -71,7 +72,7 @@ During work:
 Before ending:
 
 1. Verify outputs against acceptance criteria.
-2. Update `memory-bank/activeContext.md` and `memory-bank/progress.md`, then `TASKS.md` and any decision records under `docs/decisions/` as needed.
+2. Update `memory-bank/activeContext.md` and `memory-bank/progress.md`, then the task backend and any decision records under `docs/decisions/` as needed.
 3. Record files changed, external actions, approvals, blockers, and a concrete hand-off.
 4. Close the session record. Treat it as append-only after closure; add dated corrections rather than rewriting history.
 5. Produce due summaries by synthesis, not concatenation.

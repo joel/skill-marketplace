@@ -51,4 +51,4 @@ None.
 
 ## Handoff
 
-Follow the boot sequence in `AGENTS.md`, then complete the next action in `TASKS.md`.
+Follow the boot sequence in `AGENTS.md`, then complete the next action on the initial task in the task backend.
