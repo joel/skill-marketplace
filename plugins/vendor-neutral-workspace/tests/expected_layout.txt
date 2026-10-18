@@ -25,3 +25,4 @@ summaries
 summaries/monthly
 summaries/weekly
 summaries/yearly
+workspace.yaml

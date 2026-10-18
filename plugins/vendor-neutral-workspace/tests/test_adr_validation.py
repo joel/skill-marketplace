@@ -56,11 +56,11 @@ class AdrValidation(unittest.TestCase):
         self.assertIn("ADR-0001", self.index.read_text(encoding="utf-8"))
 
     def test_bad_status(self) -> None:
-        self.add("0002-bad-status.md", adr(status='"maybe"'))
-        self.assertIn("ERROR ADR status not in vocabulary: docs/decisions/0002-bad-status.md (maybe)", self.validate())
+        self.add("0003-bad-status.md", adr(status='"maybe"'))
+        self.assertIn("ERROR ADR status not in vocabulary: docs/decisions/0003-bad-status.md (maybe)", self.validate())
 
     def test_superseded_status_is_in_vocabulary(self) -> None:
-        self.add("0002-old.md", adr(status='"superseded by ADR-0003"'))
+        self.add("0003-old.md", adr(status='"superseded by ADR-0004"'))
         self.assertNotIn("ADR status", self.validate())
 
     def test_duplicate_number(self) -> None:
@@ -75,13 +75,13 @@ class AdrValidation(unittest.TestCase):
         self.assertIn("ERROR bad ADR filename: docs/decisions/Use-Spaces.md", self.validate())
 
     def test_missing_front_matter(self) -> None:
-        self.add("0002-no-front-matter.md", adr(front_matter=False))
-        self.assertIn("ERROR ADR missing front matter: docs/decisions/0002-no-front-matter.md", self.validate())
+        self.add("0003-no-front-matter.md", adr(front_matter=False))
+        self.assertIn("ERROR ADR missing front matter: docs/decisions/0003-no-front-matter.md", self.validate())
 
     def test_unlisted_record_is_a_warning(self) -> None:
-        self.add("0002-unlisted.md", adr(), listed=False)
+        self.add("0003-unlisted.md", adr(), listed=False)
         out = self.validate()
-        self.assertIn("WARN  ADR index drift: 0002-unlisted.md not listed in docs/decisions/README.md", out)
+        self.assertIn("WARN  ADR index drift: 0003-unlisted.md not listed in docs/decisions/README.md", out)
         self.assertIn("errors=0", out)
 
     def test_listed_but_missing_record_is_a_warning(self) -> None:

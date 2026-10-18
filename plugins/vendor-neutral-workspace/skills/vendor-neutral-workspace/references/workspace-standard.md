@@ -5,7 +5,7 @@ Use this reference when establishing, adopting, auditing, or materially changing
 ## Invariants
 
 - The workspace is authoritative; provider memory is a cache.
-- Persistent context must be human-readable and recoverable without the originating provider.
+- Persistent context must be human-readable and recoverable without the originating AI provider. Any tool the workspace relies on is declared in `workspace.yaml` and justified by a decision record. *(Changed in 2.0: v1 admitted no tooling at all.)*
 - State and task queues are mutable. Closed session records and historical decisions are append-only.
 - Every active task has one accountable owner.
 - External side effects follow explicit project approval policy.
@@ -20,6 +20,7 @@ Use this reference when establishing, adopting, auditing, or materially changing
 ├── AGENTS.md
 ├── README.md
 ├── POLICIES.md
+├── workspace.yaml
 ├── memory-bank/
 │   ├── projectbrief.md
 │   ├── productContext.md
@@ -27,7 +28,7 @@ Use this reference when establishing, adopting, auditing, or materially changing
 │   ├── techContext.md
 │   ├── activeContext.md
 │   └── progress.md
-├── TASKS.md
+├── TASKS.md                  # or .beads/ when workspace.yaml says tasks: beads
 ├── docs/decisions/
 │   ├── README.md
 │   ├── adr-template.md
@@ -48,13 +49,14 @@ One agent, identified in `AGENTS.md`, owns this layout. Add `PEOPLE.md`, `GLOSSA
 | `AGENTS.md` | Operating rules, agent identity, boot sequence | Versioned, carefully reviewed |
 | `README.md` | Short human map and entry point | Mutable |
 | `POLICIES.md` | Authority, approvals, privacy, security, retention | Controlled change |
+| `workspace.yaml` | Machine-readable facts: schema, agent id, task backend, hooks; authoritative for tooling | Changed together with a decision record |
 | `memory-bank/projectbrief.md` | Purpose, requirements, scope; the source of truth the other five build on | Mutable with review |
 | `memory-bank/productContext.md` | Why the project exists, problems solved, how it should work, UX goals | Mutable with review |
 | `memory-bank/systemPatterns.md` | Architecture as it is, patterns, component relationships, links to decision records | Maintained as the system changes |
 | `memory-bank/techContext.md` | Technologies, setup, constraints, dependencies, tool usage | Maintained as the stack changes |
 | `memory-bank/activeContext.md` | Current focus, recent changes, open questions; never the next action | Continuously maintained |
 | `memory-bank/progress.md` | What works and verified milestones; never what is left or known issues | Updated on verification |
-| `TASKS.md` | Actionable work, one owner each | Continuously maintained |
+| `TASKS.md` or `.beads/` | Tasks, in the backend `workspace.yaml` names; see the task backends reference | Continuously maintained |
 | `docs/decisions/` | One MADR record per durable decision, plus `README.md` index and `adr-template.md` | New record or status change; accepted records otherwise immutable |
 | `approvals/` | One packet per approval request | Append-only once decided |
 | `sessions/YYYY/MM/` | One record per working session | Append-only once closed |
@@ -64,6 +66,10 @@ One agent, identified in `AGENTS.md`, owns this layout. Add `PEOPLE.md`, `GLOSSA
 
 Each fact lives once and is referenced from elsewhere. Do not maintain subtly different copies.
 
+## Machine-readable facts and the task backend
+
+`workspace.yaml` is a flat `key: value` file: `schema` (2), `agent` (the stable ID in `AGENTS.md`), `tasks` (`markdown` or `beads`), `hooks` (`on` or `off`). It is authoritative for tooling; when it and a prose file disagree, fix the prose. The validator errors when `agent` differs from `AGENTS.md`, or when a backend's files are present that `tasks` does not name. The task backend is chosen at init, recorded as a decision record, and described in [the task backends](task-backends.md).
+
 ## Deterministic boot sequence
 
 `AGENTS.md` carries the sequence, so every harness that reads it boots the same way:
@@ -72,7 +78,7 @@ Each fact lives once and is referenced from elsewhere. Do not maintain subtly di
 2. Read all six `memory-bank/` files.
 3. Read `POLICIES.md`.
 4. Read `docs/decisions/README.md`; open only the accepted records relevant to the task.
-5. Read `TASKS.md`; confirm the task's owner, acceptance criteria, dependencies, blockers, and approval state.
+5. List ready work in the task backend; confirm the task's owner, acceptance criteria, dependencies, blockers, and approval state.
 6. Read the current monthly summary, when one exists.
 7. Read the latest session record; follow its Handoff to earlier records only when it points there. Reading all history is a boot-budget failure, not diligence.
 8. Open a session record before meaningful work.
@@ -141,7 +147,7 @@ Names are `YYYY-Www.md`, `YYYY-MM.md`, and `YYYY.md`. Higher levels synthesise o
 
 - **Cold start:** a fresh agent can resume from files without previous conversation.
 - **Provider replacement:** another compatible runtime can operate without hidden state.
-- **Dependency:** critical workflows have documented non-proprietary or manual alternatives.
+- **Dependency:** every tool the workspace relies on is named in `workspace.yaml`, and the task backends reference documents how to recover without it.
 - **Evidence:** material actions trace from source through task, decision, approval, artifact, and session.
 - **Restore:** important content can be restored from a tested backup.
 

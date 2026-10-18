@@ -7,7 +7,8 @@ A vendor-neutral workspace: these files, not any provider's chat history, are th
 | `AGENTS.md` | Operating rules, agent identity, boot sequence |
 | `POLICIES.md` | Authority, approvals, security, retention |
 | `memory-bank/` | Project context in six Memory Bank files: brief, product, system patterns, tech, active context, progress |
-| `TASKS.md` | Actionable work, one owner each |
+| `workspace.yaml` | Machine-readable facts: schema, agent, task backend, hooks |
+| `TASKS.md` | Actionable work, one owner each (Markdown backend; Beads uses `.beads/` instead, per `workspace.yaml`) |
 | `docs/decisions/` | Decision records (MADR), one file each, with an index |
 | `approvals/` | Approval packets for consequential actions |
 | `sessions/` | One record per working session, filed `YYYY/MM/` |

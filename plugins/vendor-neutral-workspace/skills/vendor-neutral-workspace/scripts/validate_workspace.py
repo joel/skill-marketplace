@@ -21,8 +21,8 @@ ROOT_FILES = (
     "AGENTS.md",
     "README.md",
     "POLICIES.md",
+    "workspace.yaml",
     *MEMORY_BANK_FILES,
-    "TASKS.md",
     "docs/decisions/README.md",
 )
 
@@ -41,12 +41,70 @@ ROOT_DIRS = (
 SESSION_GLOB = "[0-9][0-9][0-9][0-9]/[0-9][0-9]/*-session.md"
 AGENT_ID_PATTERN = r"[a-z0-9]+(?:-[a-z0-9]+)*"
 
+TASK_BACKENDS = ("markdown", "beads")
+
 ADR_DIR = "docs/decisions"
 ADR_INDEX = "README.md"
 ADR_TEMPLATE = "adr-template.md"
 ADR_FILENAME = re.compile(r"(?P<number>\d{4})-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md")
 ADR_STATUSES = ("proposed", "rejected", "accepted", "deprecated")
 ADR_SUPERSEDED = re.compile(r"superseded by ADR-\d{4}")
+
+
+def read_workspace_yaml(path: Path) -> dict[str, str]:
+    """workspace.yaml is deliberately flat `key: value` so no YAML library is needed."""
+    config: dict[str, str] = {}
+    if not path.is_file():
+        return config
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, separator, value = line.partition(":")
+        if separator:
+            config[key.strip()] = value.strip().strip("\"'")
+    return config
+
+
+def check_agent(root: Path, errors: list[str], warnings: list[str]) -> str | None:
+    """AGENTS.md must carry the identity block; returns the stable id when found."""
+    agents_file = root / "AGENTS.md"
+    if not agents_file.is_file():
+        return None
+    content = agents_file.read_text(encoding="utf-8", errors="replace")
+    match = re.search(r"^- Stable ID:\s*(\S+)\s*$", content, re.MULTILINE)
+    if "## Agent" not in content or not match:
+        errors.append("AGENTS.md lacks an '## Agent' block with a 'Stable ID' line")
+        return None
+    if not re.fullmatch(AGENT_ID_PATTERN, match.group(1)):
+        warnings.append(f"non-portable agent id in AGENTS.md: {match.group(1)}")
+    return match.group(1)
+
+
+def check_workspace_yaml(root: Path, agent_id: str | None, errors: list[str]) -> None:
+    """workspace.yaml is authoritative for tooling; it must agree with the files on disk."""
+    config = read_workspace_yaml(root / "workspace.yaml")
+    if not config:
+        return  # the missing-file error is reported by ROOT_FILES
+    if config.get("schema") != "2":
+        errors.append(f"workspace.yaml: schema must be 2 (got {config.get('schema', 'nothing')})")
+    if agent_id and config.get("agent") != agent_id:
+        errors.append(f"workspace.yaml agent '{config.get('agent', '')}' differs from AGENTS.md Stable ID '{agent_id}'")
+
+    tasks = config.get("tasks")
+    if tasks not in TASK_BACKENDS:
+        errors.append(f"workspace.yaml: tasks must be one of {', '.join(TASK_BACKENDS)} (got {tasks or 'nothing'})")
+        return
+    if tasks == "markdown":
+        if not (root / "TASKS.md").is_file():
+            errors.append("missing required file: TASKS.md (tasks: markdown)")
+        if (root / ".beads").exists():
+            errors.append("workspace.yaml says tasks: markdown but .beads/ exists")
+    else:
+        if not (root / ".beads").is_dir():
+            errors.append("workspace.yaml says tasks: beads but .beads/ is missing")
+        if (root / "TASKS.md").exists():
+            errors.append("workspace.yaml says tasks: beads but TASKS.md exists")
 
 
 def check_decisions(root: Path, errors: list[str], warnings: list[str]) -> None:
@@ -107,14 +165,8 @@ def main() -> int:
         if not (root / relative).is_dir():
             errors.append(f"missing required directory: {relative}")
 
-    agents_file = root / "AGENTS.md"
-    if agents_file.is_file():
-        content = agents_file.read_text(encoding="utf-8", errors="replace")
-        match = re.search(r"^- Stable ID:\s*(\S+)\s*$", content, re.MULTILINE)
-        if "## Agent" not in content or not match:
-            errors.append("AGENTS.md lacks an '## Agent' block with a 'Stable ID' line")
-        elif not re.fullmatch(AGENT_ID_PATTERN, match.group(1)):
-            warnings.append(f"non-portable agent id in AGENTS.md: {match.group(1)}")
+    agent_id = check_agent(root, errors, warnings)
+    check_workspace_yaml(root, agent_id, errors)
 
     for relative in MEMORY_BANK_FILES:
         path = root / relative

@@ -4,39 +4,22 @@ Use these contracts when creating or repairing durable workspace records. Adapt 
 
 ## Task
 
-```markdown
-### <NAMESPACE>-0001 — <Outcome-oriented title>
+Every task, whatever backend holds it (see [the task backends](task-backends.md) and `tasks:` in `workspace.yaml`), carries:
 
-- Status: proposed | ready | in-progress | waiting | blocked | review | completed | cancelled | archived
-- Priority: low | normal | high | urgent
-- Owner: <one accountable agent or human>
-- Contributors: <optional>
-- Created: <YYYY-MM-DD>
-- Updated: <YYYY-MM-DD>
-- Requested-by: <identity or source>
-- Depends-on: <IDs or none>
-- Approval: not-required | required | requested | approved | rejected
-- Approval-packet: <path under approvals/ or none>
-- Evidence: <paths, links, or none-yet>
+- a stable ID that is never reused;
+- an outcome-oriented title;
+- exactly one accountable owner; contributors are optional and named;
+- a status from `proposed | ready | in-progress | waiting | blocked | review | completed | cancelled | archived`;
+- a priority from `low | normal | high | urgent`;
+- created and updated dates, and who requested it;
+- dependencies by ID, or none;
+- acceptance criteria that can be verified;
+- an approval state from `not-required | required | requested | approved | rejected` and, when not `not-required`, the path of the approval packet under `approvals/`;
+- evidence as paths or links, or `none-yet`;
+- blockers, or none;
+- one concrete next action.
 
-#### Objective
-
-<Intended outcome>
-
-#### Acceptance criteria
-
-- <Verifiable completion condition>
-
-#### Blockers
-
-- <What or whom this is waiting for, or none>
-
-#### Next action
-
-<One concrete next step>
-```
-
-Completion requires acceptance criteria and evidence. A task with consequential execution remains in `review` until required approval or verification is complete.
+Completion requires met acceptance criteria and evidence. A task with consequential execution stays in `review` until required approval or verification is complete. The Markdown rendering of this contract is in the task backends reference; Beads maps the same fields onto its own.
 
 ## Session
 

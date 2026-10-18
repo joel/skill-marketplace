@@ -1,0 +1,1 @@
+Chosen option: "Markdown task file in the repository", because it needs no tool beyond a text editor, is readable and diffable by every harness and every human, and keeps the workspace recoverable without any binary. Beads is the documented upgrade path when computed ready-work, typed dependencies, or atomic claims are needed.
