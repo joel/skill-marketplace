@@ -9,7 +9,7 @@ Marketplace name: `joel-skills`. Catalog: `.claude-plugin/marketplace.json`.
 
 | Plugin | What it does |
 |--------|--------------|
-| `vendor-neutral-workspace` | Initialise, adopt, maintain, audit, or hand over a vendor-neutral workspace. The repository's files, not any provider's chat history or hidden memory, are the durable record of an AI agent's work, so the same subject resumes from another machine or another harness (Claude Code, Codex, Cursor, OpenCode). Ships the standard, a template, and Python scripts to create and validate a workspace. |
+| `vendor-neutral-workspace` | Initialise, adopt, maintain, audit, or hand over a vendor-neutral workspace. The repository's files, not any provider's chat history or hidden memory, are the durable record of an AI agent's work, so the same subject resumes from another machine or another harness (Claude Code, Codex, Cursor, OpenCode). One agent by default, `AGENTS.md` carrying the boot sequence; context in the six Memory Bank files; decisions as MADR 4.0 records in `docs/decisions/`; tasks in a Markdown file or in Beads, declared in `workspace.yaml`; session records, summaries and approval packets beside them. Ships the standard, the template, scripts to create, validate and migrate (v1 → v2) a workspace, and Claude Code hooks that block ending a session without its record. |
 | `execution-plan` | Drives any piece of code work through a full lifecycle: size-scaled design pass, GitHub issue, Kanban, branch, implement, seed data, internal code and security review loops, validation gates, atomic commits, live verification in a real browser, docs and diagrams, PR, automated-reviewer loop, review-thread triage, merge per project policy, optional release, and persisting what was learned. Generic: each project supplies its own repo, board, commands, gates, reviewer bot, and merge policy through its workflow doc. |
 | `prompt-debias` | Rewrites a draft prompt before you send it so the answering model cannot silently inherit your frames. Models refute what you assert but inherit what you assume. The skill inventories every injected frame, keeps real constraints and evidence, quarantines the rest as hypotheses to test, states the question neutrally, and adds instructions that force competing framings and odds-backed conclusions. Returns the rewritten prompt plus a table of what changed. Inspired by [Techintrospect's AI Bullshit Fixer](https://techintrospect.substack.com/p/ai-bullshit-fixer-prompt). |
 | `joel-tone` | Rewrites drafts, emails, Slack messages, proposals, or LLM-generated copy into Joel's voice so they read like a careful human wrote them. Picks the register first (public Vogon Partners copy or Joel's own messages), then applies the hard rules: no em or en dashes, no invented facts, no empty intensifiers, no filled-template rhythm. Ships the public-website voice brief as a reference. Returns paste-ready text plus a short note on what changed and what to check. |
@@ -54,6 +54,44 @@ in `.claude-plugin/marketplace.json` is bumped (that is the release act):
 4. Optional, for strict reproducibility: after merging, set the entry's `sha`
    to the merge commit in a follow-up PR. With a `sha` pin, even a force-push
    to `main` cannot move installed versions.
+
+For a change that spans several PRs (a rename, a new major), use an
+integration branch: branch `v2`-style off `main`, open one PR per issue into
+it (squash-merged, like `main`), keep the versions unchanged inside it, and
+test with `--plugin-dir`. The release PR merges the integration branch into
+`main` **with a merge commit, not a squash**, so the per-issue history
+survives, and is the only PR that bumps the version. A rename cannot land on
+`main` any earlier: it removes the old catalog entry, and `scripts/check.sh`
+forbids an entry without a directory.
+
+## Release notes
+
+### vendor-neutral-workspace 2.0.0 (2026-10-18)
+
+The plugin `project-agent-workspace` 1.x is renamed and redesigned. Nothing in
+the v1 layout survives unchanged, so this is a new plugin in the catalog:
+
+```
+claude plugin uninstall project-agent-workspace@joel-skills
+claude plugin marketplace update joel-skills
+claude plugin install vendor-neutral-workspace@joel-skills
+```
+
+What changed: one agent by default, with the boot sequence in `AGENTS.md`
+(no `WARM_ME_UP.md`, no `agents/` tree; the multi-agent layout is a reference
+extension); project context in the six Memory Bank files under
+`memory-bank/`; decisions as MADR 4.0.0 records in `docs/decisions/` with an
+index; tasks in `TASKS.md` or in Beads, chosen at init and declared in
+`workspace.yaml`; approval packets in `approvals/`; `sessions/`, `summaries/`,
+`artifacts/`, `archive/` at the root; Claude Code hooks that remind the agent
+of the boot sequence and block ending a session once when no session record
+was written.
+
+Existing v1 workspaces: ask Claude to adopt the project, or run
+`scripts/migrate_v1.py --root <dir>` from the installed skill for a preview,
+then `--apply`, and follow `references/migration-v1.md` for the judgement
+calls the script leaves as `<!-- MIGRATION: ... -->` markers. Nothing is
+deleted; everything consumed lands under `archive/v1/` with a manifest.
 
 ## Local development (iterate without touching the install)
 
