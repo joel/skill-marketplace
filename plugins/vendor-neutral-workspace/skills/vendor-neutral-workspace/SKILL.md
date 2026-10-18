@@ -26,7 +26,7 @@ Make the workspace—not proprietary chat history or hidden model memory—the d
 - **Scale:** Add further agents only when recurring ownership, specialised capability, permission isolation, parallel work, or a distinct audit trail justifies it; the default is one agent.
 - **Audit or hand over:** Check structural integrity, stale state, unclear ownership, missing evidence, and whether a fresh provider can resume from the files alone.
 
-Read [the workspace standard](references/workspace-standard.md) for initialise, adopt, scale, audit, or policy decisions. Read [the record contracts](references/record-contracts.md) when creating or repairing task, decision, session, approval, or summary records. Read [the task backends](references/task-backends.md) when choosing or operating the task backend. Read [the multi-agent extension](references/multi-agent-extension.md) only when more than one persistent agent is justified.
+Read [the workspace standard](references/workspace-standard.md) for initialise, adopt, scale, audit, or policy decisions. Read [the record contracts](references/record-contracts.md) when creating or repairing task, decision, session, approval, or summary records. Read [the task backends](references/task-backends.md) when choosing or operating the task backend. Read [the harness hooks](references/harness-hooks.md) when a session is blocked at its end or when wiring another harness. Read [the multi-agent extension](references/multi-agent-extension.md) only when more than one persistent agent is justified.
 
 ## Initialise or adopt
 
