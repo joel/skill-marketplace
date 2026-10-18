@@ -1,4 +1,4 @@
-# Project tasks — {{PROJECT_NAME}}
+# Tasks — {{PROJECT_NAME}}
 
 ## Active
 
@@ -12,7 +12,8 @@
 - Requested-by: project-owner
 - Depends-on: none
 - Approval: not-required
-- Evidence: README.md, AGENTS.md, project/
+- Approval-packet: none
+- Evidence: README.md, AGENTS.md, ABOUT.md, POLICIES.md
 
 #### Objective
 
@@ -21,7 +22,7 @@ Replace unknown initial values with verified project purpose, scope, outcomes, s
 #### Acceptance criteria
 
 - Project owner confirms purpose, scope, and intended outcomes.
-- Project and agent state contain no unlabelled assumptions.
+- `ABOUT.md` and `STATE.md` contain no unlabelled assumptions.
 - Every active task has one owner and a next action.
 
 #### Blockers

@@ -8,7 +8,7 @@
 
 ## Objective
 
-Initialise a vendor-neutral project agent workspace.
+Initialise a vendor-neutral workspace.
 
 ## Inputs and sources
 
@@ -18,7 +18,7 @@ Initialise a vendor-neutral project agent workspace.
 ## Actions performed
 
 - Created missing workspace structure and initial records without overwriting existing files.
-- Registered {{AGENT_NAME}} as the initial {{AGENT_ROLE}}.
+- Recorded {{AGENT_NAME}} (`{{AGENT_ID}}`) as the {{AGENT_ROLE}} in `AGENTS.md`.
 
 ## Findings
 
@@ -50,4 +50,4 @@ None.
 
 ## Handoff
 
-Follow `WARM_ME_UP.md`, then complete the next action in `project/TASKS.md`.
+Follow the boot sequence in `AGENTS.md`, then complete the next action in `TASKS.md`.

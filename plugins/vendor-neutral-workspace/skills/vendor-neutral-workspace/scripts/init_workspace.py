@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Preview or create a vendor-neutral project agent workspace without overwrites."""
+"""Preview or create a vendor-neutral workspace without overwrites."""
 
 from __future__ import annotations
 
@@ -11,24 +11,13 @@ from pathlib import Path
 
 
 EMPTY_DIRS = (
-    "inbox",
-    "outbox",
+    "approvals",
     "artifacts",
-    "decisions",
+    "archive",
+    "sessions/{year}/{month}",
     "summaries/weekly",
     "summaries/monthly",
     "summaries/yearly",
-    "archive",
-    "agents/{agent_id}/inbox",
-    "agents/{agent_id}/outbox",
-    "agents/{agent_id}/artifacts",
-    "agents/{agent_id}/handoffs",
-    "agents/{agent_id}/sessions/{year}/{month}",
-    "agents/{agent_id}/summaries/weekly",
-    "agents/{agent_id}/summaries/monthly",
-    "agents/{agent_id}/summaries/yearly",
-    "agents/{agent_id}/archive",
-    "agents/{agent_id}/.skills",
 )
 
 
@@ -88,19 +77,17 @@ def main() -> int:
     for source in sorted(template_root.rglob("*")):
         if not source.is_file():
             continue
-        relative = source.relative_to(template_root)
-        parts = [agent_id if part == "_agent-template" else part for part in relative.parts]
-        file_actions.append((source, root.joinpath(*parts)))
+        file_actions.append((source, root / source.relative_to(template_root)))
 
     initial_session = template_root.parent / "initial-session.md"
     session_name = now.strftime("%d-%H%M%SZ-session.md")
-    session_target = root / "agents" / agent_id / "sessions" / values["YEAR"] / values["MONTH"] / session_name
-    existing_sessions = list((root / "agents" / agent_id / "sessions").glob("[0-9][0-9][0-9][0-9]/[0-9][0-9]/*-session.md"))
+    session_target = root / "sessions" / values["YEAR"] / values["MONTH"] / session_name
+    existing_sessions = list((root / "sessions").glob("[0-9][0-9][0-9][0-9]/[0-9][0-9]/*-session.md"))
     if not existing_sessions:
         file_actions.append((initial_session, session_target))
 
     directories = [
-        root / item.format(agent_id=agent_id, year=values["YEAR"], month=values["MONTH"])
+        root / item.format(year=values["YEAR"], month=values["MONTH"])
         for item in EMPTY_DIRS
     ]
     directories.extend(target.parent for _, target in file_actions)
