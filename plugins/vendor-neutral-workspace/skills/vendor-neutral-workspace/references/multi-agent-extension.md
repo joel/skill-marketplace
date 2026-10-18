@@ -55,7 +55,7 @@ Root files hold shared, cross-agent material. Agent directories hold role-specif
 3. Create `agents/<agent-id>/` from the templates below. Create only missing files; never overwrite.
 4. Add the registry entry with status `proposed`, then `active` once the project owner confirms the mandate.
 5. Give the agent one initial task in its `TASKS.md`, owned by it, with acceptance criteria and a next action.
-6. Record the creation in the creating agent's session record and in root `STATE.md`.
+6. Record the creation in the creating agent's session record and in root `memory-bank/activeContext.md`.
 7. Run the agent's cold-start test: a fresh session reads only its `WARM_ME_UP.md` and states its mandate, current state, active task, constraints, and next action.
 
 The first agent may coordinate the project while also doing small cross-cutting work. Delegate substantial domain work when separate ownership improves continuity, safety, or auditability. Do not create a decorative hierarchy.
@@ -113,7 +113,7 @@ States: `proposed` (defined, not yet confirmed), `active`, `paused` (no work exp
 ## Sources of truth
 
 - ../../AGENTS.md
-- ../../ABOUT.md, ../../STATE.md, ../../TASKS.md, ../../docs/decisions/
+- ../../memory-bank/, ../../TASKS.md, ../../docs/decisions/
 - ../REGISTRY.md
 - This agent workspace
 
@@ -130,7 +130,7 @@ States: `proposed` (defined, not yet confirmed), `active`, `paused` (no work exp
 Before meaningful work:
 
 1. Read `../../AGENTS.md`.
-2. Read `../../ABOUT.md` and `../../STATE.md`.
+2. Read all six files in `../../memory-bank/`.
 3. Read `../../POLICIES.md`, then `ABOUT.md` and `POLICIES.md` here.
 4. Read `../../docs/decisions/README.md`, open only the accepted records relevant to the task, and read `DECISIONS.md` here.
 5. Read `TASKS.md` here and the entries in `../../TASKS.md` that name this agent; confirm owner, acceptance criteria, dependencies, blockers, and approval state.
@@ -144,7 +144,7 @@ Do not trust remembered information unless it is verified against the workspace 
 
 A coordinator's `WARM_ME_UP.md` adds, after step 5: read `../REGISTRY.md` and check for unowned, stale, blocked, overdue, or conflicting work across agents.
 
-`POLICIES.md` starts with "Follow `../../POLICIES.md`." and then lists only what is narrower for this role: permitted actions, actions needing approval, prohibitions, and the tool and data scope actually granted. `STATE.md` and `TASKS.md` use the root templates and record contracts unchanged, scoped to the agent; the agent's `TASKS.md` lists the IDs it owns and links cross-agent tasks that live in root `TASKS.md` rather than copying them. The agent's `DECISIONS.md` lists and links the records in root `docs/decisions/` that this agent owns; it holds no decision text of its own.
+`POLICIES.md` starts with "Follow `../../POLICIES.md`." and then lists only what is narrower for this role: permitted actions, actions needing approval, prohibitions, and the tool and data scope actually granted. `TASKS.md` uses the root template and task contract unchanged, scoped to the agent; it lists the IDs the agent owns and links cross-agent tasks that live in root `TASKS.md` rather than copying them. `STATE.md` holds the agent's current position, priorities, waiting-for items, and risks; shared project context stays in root `memory-bank/`. The agent's `DECISIONS.md` lists and links the records in root `docs/decisions/` that this agent owns; it holds no decision text of its own.
 
 ## Coordination
 

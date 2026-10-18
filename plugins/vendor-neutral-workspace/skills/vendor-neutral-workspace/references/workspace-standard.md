@@ -20,8 +20,13 @@ Use this reference when establishing, adopting, auditing, or materially changing
 ├── AGENTS.md
 ├── README.md
 ├── POLICIES.md
-├── ABOUT.md
-├── STATE.md
+├── memory-bank/
+│   ├── projectbrief.md
+│   ├── productContext.md
+│   ├── systemPatterns.md
+│   ├── techContext.md
+│   ├── activeContext.md
+│   └── progress.md
 ├── TASKS.md
 ├── docs/decisions/
 │   ├── README.md
@@ -34,7 +39,7 @@ Use this reference when establishing, adopting, auditing, or materially changing
 └── archive/
 ```
 
-One agent, identified in `AGENTS.md`, owns this layout. Add `PEOPLE.md`, `SYSTEMS.md`, `GLOSSARY.md`, or domain directories only when their information exists and has a clear owner. Several agents need the per-agent layout described in the extension.
+One agent, identified in `AGENTS.md`, owns this layout. Add `PEOPLE.md`, `GLOSSARY.md`, further files under `memory-bank/`, or domain directories only when their information exists and has a clear owner. Several agents need the per-agent layout described in the extension.
 
 ## File responsibilities
 
@@ -43,8 +48,12 @@ One agent, identified in `AGENTS.md`, owns this layout. Add `PEOPLE.md`, `SYSTEM
 | `AGENTS.md` | Operating rules, agent identity, boot sequence | Versioned, carefully reviewed |
 | `README.md` | Short human map and entry point | Mutable |
 | `POLICIES.md` | Authority, approvals, privacy, security, retention | Controlled change |
-| `ABOUT.md` | Stable project identity, scope, outcomes | Mutable with review |
-| `STATE.md` | Concise current situation and priorities | Continuously maintained |
+| `memory-bank/projectbrief.md` | Purpose, requirements, scope; the source of truth the other five build on | Mutable with review |
+| `memory-bank/productContext.md` | Why the project exists, problems solved, how it should work, UX goals | Mutable with review |
+| `memory-bank/systemPatterns.md` | Architecture as it is, patterns, component relationships, links to decision records | Maintained as the system changes |
+| `memory-bank/techContext.md` | Technologies, setup, constraints, dependencies, tool usage | Maintained as the stack changes |
+| `memory-bank/activeContext.md` | Current focus, recent changes, open questions; never the next action | Continuously maintained |
+| `memory-bank/progress.md` | What works and verified milestones; never what is left or known issues | Updated on verification |
 | `TASKS.md` | Actionable work, one owner each | Continuously maintained |
 | `docs/decisions/` | One MADR record per durable decision, plus `README.md` index and `adr-template.md` | New record or status change; accepted records otherwise immutable |
 | `approvals/` | One packet per approval request | Append-only once decided |
@@ -60,7 +69,7 @@ Each fact lives once and is referenced from elsewhere. Do not maintain subtly di
 `AGENTS.md` carries the sequence, so every harness that reads it boots the same way:
 
 1. Read `AGENTS.md`.
-2. Read `ABOUT.md` and `STATE.md`.
+2. Read all six `memory-bank/` files.
 3. Read `POLICIES.md`.
 4. Read `docs/decisions/README.md`; open only the accepted records relevant to the task.
 5. Read `TASKS.md`; confirm the task's owner, acceptance criteria, dependencies, blockers, and approval state.
@@ -86,6 +95,22 @@ Material work should distinguish:
 - **approval:** permission for a specific consequential action.
 
 Link tasks, decisions, sessions, approvals, and artifacts so a reviewer can trace important outcomes. Preserve source originals and document transformations when practical.
+
+## Memory bank
+
+Project context lives in `memory-bank/`, in the six files of the Memory Bank pattern (Cline, Nick Baumann, 2025: <https://docs.cline.bot/features/memory-bank>). The files build on each other:
+
+```text
+projectbrief.md ──► productContext.md ──┐
+                ──► systemPatterns.md ──┼──► activeContext.md ──► progress.md
+                ──► techContext.md   ───┘
+```
+
+Read all six at the start of every session; they are short by design. Update them when a project pattern is discovered, after a significant change, when context needs clarification, and on the phrase "update memory bank", which means reviewing every file with attention on `activeContext.md` and `progress.md`. Each file carries an `Updated` line so staleness is visible.
+
+Two files are scoped more tightly than in the original pattern, so they do not duplicate the task list: `activeContext.md` holds focus, recent changes, and open questions, never the next action; `progress.md` holds what works and verified milestones, never what is left or known issues. Both of those belong on tasks.
+
+The pattern on its own has no tasks, no decision history, no session log, no hand-off, and no approval record, and it rewrites files in place, so it keeps no history. That is why `TASKS.md`, `docs/decisions/`, `sessions/`, `summaries/`, and `approvals/` sit beside it: the memory bank is the current picture, the rest is the record.
 
 ## Decisions
 
