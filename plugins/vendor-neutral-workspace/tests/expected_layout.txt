@@ -1,8 +1,6 @@
-ABOUT.md
 AGENTS.md
 POLICIES.md
 README.md
-STATE.md
 TASKS.md
 approvals
 archive
@@ -12,6 +10,13 @@ docs/decisions
 docs/decisions/NNNN-title.md
 docs/decisions/README.md
 docs/decisions/adr-template.md
+memory-bank
+memory-bank/activeContext.md
+memory-bank/productContext.md
+memory-bank/progress.md
+memory-bank/projectbrief.md
+memory-bank/systemPatterns.md
+memory-bank/techContext.md
 sessions
 sessions/YYYY
 sessions/YYYY/MM

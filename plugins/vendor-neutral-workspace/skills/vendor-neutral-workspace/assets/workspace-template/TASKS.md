@@ -13,7 +13,7 @@
 - Depends-on: none
 - Approval: not-required
 - Approval-packet: none
-- Evidence: README.md, AGENTS.md, ABOUT.md, POLICIES.md
+- Evidence: README.md, AGENTS.md, memory-bank/, POLICIES.md
 
 #### Objective
 
@@ -22,12 +22,12 @@ Replace unknown initial values with verified project purpose, scope, outcomes, s
 #### Acceptance criteria
 
 - Project owner confirms purpose, scope, and intended outcomes.
-- `ABOUT.md` and `STATE.md` contain no unlabelled assumptions.
+- No file in `memory-bank/` contains an unlabelled assumption.
 - Every active task has one owner and a next action.
 
 #### Blockers
 
-- Awaiting project-owner input.
+- None yet; the project owner has not been asked. Move to `waiting` once the question is sent.
 
 #### Next action
 

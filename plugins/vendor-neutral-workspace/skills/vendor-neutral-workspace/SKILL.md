@@ -60,7 +60,7 @@ Before meaningful work:
 
 During work:
 
-- keep mutable state concise and current;
+- keep `memory-bank/activeContext.md` concise and current, and when the user says "update memory bank" review every file in `memory-bank/`;
 - record facts, inferences, assumptions, proposals, decisions, and approvals as different categories;
 - write a decision record under `docs/decisions/` when a choice could later be undone without knowing why it was made, and stop to propose a change when a task conflicts with an accepted record;
 - link material claims and completed tasks to evidence or artifacts;
@@ -71,7 +71,7 @@ During work:
 Before ending:
 
 1. Verify outputs against acceptance criteria.
-2. Update `STATE.md`, `TASKS.md`, and any decision records under `docs/decisions/` as needed.
+2. Update `memory-bank/activeContext.md` and `memory-bank/progress.md`, then `TASKS.md` and any decision records under `docs/decisions/` as needed.
 3. Record files changed, external actions, approvals, blockers, and a concrete hand-off.
 4. Close the session record. Treat it as append-only after closure; add dated corrections rather than rewriting history.
 5. Produce due summaries by synthesis, not concatenation.
