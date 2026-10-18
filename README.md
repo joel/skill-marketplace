@@ -123,6 +123,8 @@ plugins/
   <plugin-name>/
     .claude-plugin/plugin.json      ← plugin manifest
     skills/<skill-name>/SKILL.md    ← the skill itself
+    hooks/hooks.json                ← optional Claude Code hooks (scripts next to it, called via ${CLAUDE_PLUGIN_ROOT})
+    tests/                          ← optional unittest suite, run by scripts/check.sh
 templates/plugin/                   ← copy this to start a new plugin
 scripts/check.sh                    ← validates manifests + version consistency
 ```
