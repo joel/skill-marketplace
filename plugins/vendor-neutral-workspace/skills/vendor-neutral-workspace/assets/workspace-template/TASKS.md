@@ -27,7 +27,7 @@ Replace unknown initial values with verified project purpose, scope, outcomes, s
 
 #### Blockers
 
-- Awaiting project-owner input.
+- None yet; the project owner has not been asked. Move to `waiting` once the question is sent.
 
 #### Next action
 
