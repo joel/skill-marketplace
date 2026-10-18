@@ -1,12 +1,19 @@
 # {{PROJECT_NAME}}
 
-This directory is a vendor-neutral persistent workspace for human and AI collaborators.
+A vendor-neutral workspace: these files, not any provider's chat history, are the durable record of the work. Humans and AI agents start by reading `AGENTS.md`.
 
-Start with:
+| Path | Holds |
+| --- | --- |
+| `AGENTS.md` | Operating rules, agent identity, boot sequence |
+| `POLICIES.md` | Authority, approvals, security, retention |
+| `ABOUT.md` | Project identity, scope, outcomes |
+| `STATE.md` | Current situation and priorities |
+| `TASKS.md` | Actionable work, one owner each |
+| `DECISIONS.md` | Durable decisions, superseded ones kept |
+| `approvals/` | Approval packets for consequential actions |
+| `sessions/` | One record per working session, filed `YYYY/MM/` |
+| `summaries/` | Weekly, monthly, yearly syntheses |
+| `artifacts/` | Outputs and evidence |
+| `archive/` | Retired material; history is never deleted |
 
-1. `AGENTS.md` for operating rules.
-2. `project/ABOUT.md` and `project/POLICIES.md` for shared context and authority.
-3. `agents/REGISTRY.md` to locate an agent.
-4. `agents/<agent-id>/WARM_ME_UP.md` to initialise that agent.
-
-Project created: {{DATE}}
+Created: {{DATE}}
