@@ -71,7 +71,7 @@ State `None` if no external action occurred.
 
 ## Open questions and blockers
 
-## State and task updates
+## Memory-bank and task updates
 
 ## Handoff
 

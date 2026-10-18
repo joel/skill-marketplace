@@ -18,6 +18,7 @@ Initialise a vendor-neutral workspace.
 ## Actions performed
 
 - Created missing workspace structure and initial records without overwriting existing files.
+- Created the six memory-bank files with `unknown` placeholders.
 - Recorded {{AGENT_NAME}} (`{{AGENT_ID}}`) as the {{AGENT_ROLE}} in `AGENTS.md`.
 
 ## Findings
@@ -44,7 +45,7 @@ None.
 
 - Confirm the project foundation and authority with the project owner.
 
-## State and task updates
+## Memory-bank and task updates
 
 - Created `SETUP-0001` and assigned it to {{AGENT_ID}}.
 

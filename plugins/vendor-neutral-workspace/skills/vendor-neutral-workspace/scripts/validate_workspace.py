@@ -8,17 +8,26 @@ import re
 from pathlib import Path
 
 
+MEMORY_BANK_FILES = (
+    "memory-bank/projectbrief.md",
+    "memory-bank/productContext.md",
+    "memory-bank/systemPatterns.md",
+    "memory-bank/techContext.md",
+    "memory-bank/activeContext.md",
+    "memory-bank/progress.md",
+)
+
 ROOT_FILES = (
     "AGENTS.md",
     "README.md",
     "POLICIES.md",
-    "ABOUT.md",
-    "STATE.md",
+    *MEMORY_BANK_FILES,
     "TASKS.md",
     "docs/decisions/README.md",
 )
 
 ROOT_DIRS = (
+    "memory-bank",
     "docs/decisions",
     "approvals",
     "sessions",
@@ -106,6 +115,11 @@ def main() -> int:
             errors.append("AGENTS.md lacks an '## Agent' block with a 'Stable ID' line")
         elif not re.fullmatch(AGENT_ID_PATTERN, match.group(1)):
             warnings.append(f"non-portable agent id in AGENTS.md: {match.group(1)}")
+
+    for relative in MEMORY_BANK_FILES:
+        path = root / relative
+        if path.is_file() and not re.search(r"^- Updated:\s*\d{4}-\d{2}-\d{2}", path.read_text(encoding="utf-8", errors="replace"), re.MULTILINE):
+            warnings.append(f"memory-bank file without an Updated date: {relative}")
 
     check_decisions(root, errors, warnings)
 
