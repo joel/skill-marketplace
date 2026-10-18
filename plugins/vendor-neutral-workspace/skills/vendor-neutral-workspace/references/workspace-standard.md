@@ -149,6 +149,6 @@ Names are `YYYY-Www.md`, `YYYY-MM.md`, and `YYYY.md`. Higher levels synthesise o
 - **Provider replacement:** another compatible runtime can operate without hidden state.
 - **Dependency:** every tool the workspace relies on is named in `workspace.yaml`, and the task backends reference documents how to recover without it.
 - **Evidence:** material actions trace from source through task, decision, approval, artifact, and session.
-- **Restore:** important content can be restored from a tested backup.
+- **Restore:** important content can be restored from a tested backup; for Beads, the committed `.beads/issues.jsonl` rebuilds the task list with `bd import` (see the task backends reference).
 
 Record failures as owned tasks with acceptance criteria and next actions.

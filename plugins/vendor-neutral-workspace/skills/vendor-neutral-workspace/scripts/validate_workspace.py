@@ -103,6 +103,8 @@ def check_workspace_yaml(root: Path, agent_id: str | None, errors: list[str]) ->
     else:
         if not (root / ".beads").is_dir():
             errors.append("workspace.yaml says tasks: beads but .beads/ is missing")
+        elif not (root / ".beads" / "issues.jsonl").is_file():
+            errors.append("missing .beads/issues.jsonl (tasks: beads); run `bd export -o .beads/issues.jsonl`")
         if (root / "TASKS.md").exists():
             errors.append("workspace.yaml says tasks: beads but TASKS.md exists")
 
