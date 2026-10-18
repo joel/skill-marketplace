@@ -41,7 +41,7 @@ Root files hold shared, cross-agent material. Agent directories hold role-specif
 | Agent `WARM_ME_UP.md` | Deterministic cold-start sequence for that agent | Stable; test changes |
 | Agent `POLICIES.md` | Role-specific authority and constraints, narrower than root `POLICIES.md` | Controlled change |
 | Agent `STATE.md` | Current role state and priorities | Continuously maintained |
-| Agent `TASKS.md` | The agent's owned queue; cross-agent initiatives stay in root `TASKS.md` | Continuously maintained |
+| Agent `TASKS.md` | The agent's owned queue; cross-agent initiatives stay in the root task backend | Continuously maintained |
 | Agent `DECISIONS.md` | Index of the decision records this agent owns; the records themselves are ADRs in root `docs/decisions/` with the scope stated in their context | Append |
 | Agent `inbox/`, `outbox/` | Messages to and from this agent | Append-only |
 | Agent `handoffs/` | Hand-offs this agent has sent | Append-only once acknowledged |
@@ -133,7 +133,7 @@ Before meaningful work:
 2. Read all six files in `../../memory-bank/`.
 3. Read `../../POLICIES.md`, then `ABOUT.md` and `POLICIES.md` here.
 4. Read `../../docs/decisions/README.md`, open only the accepted records relevant to the task, and read `DECISIONS.md` here.
-5. Read `TASKS.md` here and the entries in `../../TASKS.md` that name this agent; confirm owner, acceptance criteria, dependencies, blockers, and approval state.
+5. Read `TASKS.md` here and the root task backend's entries that name this agent; confirm owner, acceptance criteria, dependencies, blockers, and approval state.
 6. Read `inbox/` for unacknowledged messages and hand-offs addressed to this agent.
 7. Read the current monthly summary here, when one exists.
 8. Read the latest session record here; follow its Handoff to earlier records only when it points there.
@@ -144,12 +144,12 @@ Do not trust remembered information unless it is verified against the workspace 
 
 A coordinator's `WARM_ME_UP.md` adds, after step 5: read `../REGISTRY.md` and check for unowned, stale, blocked, overdue, or conflicting work across agents.
 
-`POLICIES.md` starts with "Follow `../../POLICIES.md`." and then lists only what is narrower for this role: permitted actions, actions needing approval, prohibitions, and the tool and data scope actually granted. `TASKS.md` uses the root template and task contract unchanged, scoped to the agent; it lists the IDs the agent owns and links cross-agent tasks that live in root `TASKS.md` rather than copying them. `STATE.md` holds the agent's current position, priorities, waiting-for items, and risks; shared project context stays in root `memory-bank/`. The agent's `DECISIONS.md` lists and links the records in root `docs/decisions/` that this agent owns; it holds no decision text of its own.
+`POLICIES.md` starts with "Follow `../../POLICIES.md`." and then lists only what is narrower for this role: permitted actions, actions needing approval, prohibitions, and the tool and data scope actually granted. `TASKS.md` uses the root template and task contract unchanged, scoped to the agent; it lists the IDs the agent owns and links cross-agent tasks that live in the root task backend rather than copying them. `STATE.md` holds the agent's current position, priorities, waiting-for items, and risks; shared project context stays in root `memory-bank/`. The agent's `DECISIONS.md` lists and links the records in root `docs/decisions/` that this agent owns; it holds no decision text of its own.
 
 ## Coordination
 
 - One task has exactly one accountable owner even when several agents contribute. Contributors are named on the task; ownership moves only through a hand-off.
-- Cross-agent initiatives live in root `TASKS.md`; each agent's queue lives in its own `TASKS.md`.
+- Cross-agent initiatives live in the root task backend named in `workspace.yaml`; each agent's queue lives in its own `TASKS.md`.
 - The coordinator reviews the registry and the root task list at every boot, routes unowned work, and escalates conflicts it cannot resolve by policy, ownership, or evidence.
 - Agents do not edit another agent's `STATE.md`, `TASKS.md`, or `DECISIONS.md`. They send a message or a hand-off instead.
 

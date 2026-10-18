@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -43,6 +44,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--agent-id", default="main", help="Stable lowercase agent ID")
     parser.add_argument("--agent-name", default=None, help="Human-readable agent name")
     parser.add_argument("--role", default="Coordinator", help="Initial agent role")
+    parser.add_argument(
+        "--tasks",
+        choices=("markdown", "beads"),
+        default="markdown",
+        help="Task backend; recorded in workspace.yaml and a decision record (default: markdown)",
+    )
     parser.add_argument("--apply", action="store_true", help="Create missing paths; default is preview")
     return parser.parse_args()
 
@@ -67,11 +74,22 @@ def main() -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    root = args.root.expanduser().resolve()
-    template_root = Path(__file__).resolve().parent.parent / "assets" / "workspace-template"
-    if not template_root.is_dir():
-        print(f"error: template directory not found: {template_root}", file=sys.stderr)
+    if args.tasks == "beads":
+        print(
+            "error: --tasks beads is not yet supported by this version; use --tasks markdown "
+            "(the Beads backend arrives in a later release)",
+            file=sys.stderr,
+        )
         return 2
+
+    root = args.root.expanduser().resolve()
+    assets_root = Path(__file__).resolve().parent.parent / "assets"
+    template_root = assets_root / "workspace-template"
+    backend_root = assets_root / "task-backends" / args.tasks
+    for required in (template_root, backend_root / "files", backend_root / "fragments"):
+        if not required.is_dir():
+            print(f"error: template directory not found: {required}", file=sys.stderr)
+            return 2
 
     now = dt.datetime.now(dt.timezone.utc)
     values = {
@@ -83,10 +101,18 @@ def main() -> int:
         "YEAR": f"{now.year:04d}",
         "MONTH": f"{now.month:02d}",
         "TIMESTAMP": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "TASK_BACKEND": args.tasks,
     }
     if not values["PROJECT_NAME"]:
         print("error: --project cannot be empty", file=sys.stderr)
         return 2
+
+    # Backend fragments fill the backend-specific blocks of shared templates:
+    # fragments/block.md -> {{TASK_BACKEND_BLOCK}} (AGENTS.md "Tasks" section),
+    # fragments/decision.md -> {{TASK_BACKEND_DECISION}} (the task-backend ADR).
+    # render() is literal substitution, so fragments must not contain placeholders.
+    for fragment in sorted((backend_root / "fragments").glob("*.md")):
+        values["TASK_BACKEND_" + fragment.stem.upper().replace("-", "_")] = fragment.read_text(encoding="utf-8").strip()
 
     # Decision records: a template record whose slug already exists in the target
     # maps to that file (and is skipped), so re-running init never duplicates it;
@@ -112,6 +138,10 @@ def main() -> int:
             values[f"ADR_{template_number:04d}_FILE"] = target_name
             relative = relative.with_name(target_name)
         file_actions.append((source, root / relative))
+    # Backend-specific files (for example TASKS.md) land at the root alongside the shared ones.
+    for source in sorted((backend_root / "files").rglob("*")):
+        if source.is_file():
+            file_actions.append((source, root / source.relative_to(backend_root / "files")))
 
     initial_session = template_root.parent / "initial-session.md"
     session_name = now.strftime("%d-%H%M%SZ-session.md")
@@ -128,6 +158,9 @@ def main() -> int:
 
     mode = "APPLY" if args.apply else "PREVIEW"
     print(f"{mode}: {root}")
+    print(f"task backend: {args.tasks}")
+    if shutil.which("bd") and args.tasks != "beads":
+        print("bd detected on PATH: pass --tasks beads once the Beads backend is available (this version: markdown only)")
     for directory in sorted(set(directories)):
         if directory.exists():
             print(f"KEEP directory {directory}")
