@@ -59,8 +59,9 @@ For a change that spans several PRs (a rename, a new major), use an
 integration branch: branch `v2`-style off `main`, open one PR per issue into
 it (squash-merged, like `main`), keep the versions unchanged inside it, and
 test with `--plugin-dir`. The release PR merges the integration branch into
-`main` **with a merge commit, not a squash**, so the per-issue history
-survives, and is the only PR that bumps the version. A rename cannot land on
+`main` **with a rebase merge, not a squash**, so the per-issue commits land on
+`main` in order (`main` requires linear history, so a merge commit is not
+allowed), and it is the only PR that bumps the version. A rename cannot land on
 `main` any earlier: it removes the old catalog entry, and `scripts/check.sh`
 forbids an entry without a directory.
 
