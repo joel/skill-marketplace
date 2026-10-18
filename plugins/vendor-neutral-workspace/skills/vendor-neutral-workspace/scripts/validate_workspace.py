@@ -159,6 +159,11 @@ def main() -> int:
     errors: list[str] = []
     warnings: list[str] = []
 
+    if (root / "project" / "ABOUT.md").is_file() and (root / "agents").is_dir():
+        print("ERROR v1 layout detected (project/ and agents/): run scripts/migrate_v1.py --root <root>, then follow references/migration-v1.md")
+        print("summary: errors=1 warnings=0")
+        return 1
+
     for relative in ROOT_FILES:
         if not (root / relative).is_file():
             errors.append(f"missing required file: {relative}")
@@ -189,6 +194,8 @@ def main() -> int:
             continue
         if re.search(r"\{\{[A-Z][A-Z0-9_]*\}\}", content):
             errors.append(f"unresolved template variable: {markdown.relative_to(root)}")
+        if "<!-- MIGRATION:" in content and not markdown.is_relative_to(root / "archive"):
+            warnings.append(f"migration marker remains: {markdown.relative_to(root)}")
 
     for item in errors:
         print(f"ERROR {item}")

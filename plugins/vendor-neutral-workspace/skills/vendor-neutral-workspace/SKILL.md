@@ -33,7 +33,7 @@ Read [the workspace standard](references/workspace-standard.md) for initialise, 
 1. Read any existing root instructions and policies. They override defaults in this skill.
 2. Inspect the target without changing it. Identify existing sources of truth, version control, sensitive material, naming conventions, active work, and conflicts.
 3. Choose the minimum topology that preserves continuity. The default is one agent and the flat layout in the standard; a single agent still needs explicit identity, state, tasks, policies, decisions, and sessions. Do not add agents or optional knowledge files without a real need.
-4. For a populated target, present the proposed mapping and risks before relocating, renaming, deleting, or overwriting anything.
+4. For a populated target, present the proposed mapping and risks before relocating, renaming, deleting, or overwriting anything. If the target is a v1 workspace (`project/` and `agents/<id>/`), run `scripts/migrate_v1.py --root <dir>` for the preview, then follow [the migration guide](references/migration-v1.md); it moves and converts what it can and leaves `<!-- MIGRATION: ... -->` markers where judgement is needed.
 5. Create only missing structure. Preserve unrelated content and never silently replace an existing file.
 6. Populate files with actual project facts or clearly marked `unknown` items. Never turn guesses into durable facts.
 7. Choose the task backend (`--tasks`, default `markdown`; propose `beads` when `bd` is on PATH and the project needs computed ready-work or atomic claims), record the agent's identity in `AGENTS.md`, create an initial task, record the initialisation session, and state the next action.
