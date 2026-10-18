@@ -1,11 +1,20 @@
 ---
-name: project-agent-workspace
-description: Initialise, adopt, maintain, audit, or hand over a vendor-neutral project workspace for one or more AI agents. Use when starting an agent-managed project, making agent state portable across providers, creating a coordinator or specialist agent, or repairing missing task, state, decision, session, summary, approval, and hand-off records. Do not use merely to organise ordinary files when no persistent agent workflow is wanted.
-metadata:
-  version: "1.0.0"
+name: vendor-neutral-workspace
+description: >-
+  Initialise, adopt, maintain, audit, or hand over a vendor-neutral workspace:
+  the repository's files, not any provider's chat history or hidden memory, are
+  the durable record of an AI agent's work, so the same subject resumes from
+  another machine or another harness (Claude Code, Codex, Cursor, OpenCode).
+  Use whenever the user says "initialise a workspace", "set up the agent
+  workspace", "adopt this project", "resume on another machine", "cold start",
+  "hand over", "update memory bank", "record a decision", "audit the
+  workspace", or wants agent state portable across providers, and whenever
+  task, context, decision, session, summary, or approval records are missing or
+  stale. Do not use merely to organise ordinary files when no persistent agent
+  workflow is wanted.
 ---
 
-# Project Agent Workspace
+# Vendor-neutral workspace
 
 Make the workspace—not proprietary chat history or hidden model memory—the durable system of record.
 

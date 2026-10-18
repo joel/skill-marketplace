@@ -7,8 +7,8 @@
   },
   "plugins": [
     {
-      "name": "project-agent-workspace",
-      "description": "Initialise, adopt, maintain, audit, or hand over a vendor-neutral project workspace for one or more AI agents: portable task, state, decision, session, approval, and hand-off records that survive switching providers.",
+      "name": "vendor-neutral-workspace",
+      "description": "Initialise, adopt, maintain, audit, or hand over a vendor-neutral workspace: the repository's files, not any provider's chat history or hidden memory, are the durable record of an AI agent's work, so the same subject resumes from another machine or another harness. Ships the standard, a template, and scripts to create and validate a workspace.",
       "author": {
         "name": "Joel Azemar"
       },
@@ -17,7 +17,7 @@
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/joel/skill-marketplace.git",
-        "path": "plugins/project-agent-workspace",
+        "path": "plugins/vendor-neutral-workspace",
         "ref": "main"
       }
     },

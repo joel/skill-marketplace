@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Validate the marketplace catalog and every plugin, and make sure each
-# plugin's version matches its catalog entry. Run before opening a PR.
+# Validate the marketplace catalog and every plugin, make sure each plugin's
+# version matches its catalog entry, and run any plugin's tests/ directory.
+# Run before opening a PR.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -19,6 +20,11 @@ for dir in plugins/*/; do
     echo "   MISSING $manifest"; fail=1; continue
   fi
   claude plugin validate "$dir" || fail=1
+
+  if [ -d "${dir}tests" ]; then
+    echo "   tests"
+    python3 -m unittest discover -s "${dir}tests" -q || fail=1
+  fi
 
   plugin_version=$(jq -r .version "$manifest")
   catalog_version=$(jq -r --arg n "$name" '.plugins[] | select(.name == $n) | .version' "$catalog")

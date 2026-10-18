@@ -13,7 +13,7 @@ Initialise a vendor-neutral project agent workspace.
 ## Inputs and sources
 
 - Project name supplied during initialisation: {{PROJECT_NAME}}
-- `project-agent-workspace` skill
+- `vendor-neutral-workspace` skill
 
 ## Actions performed
 
