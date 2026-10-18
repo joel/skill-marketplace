@@ -1,6 +1,6 @@
 # Task backends
 
-The task contract in [the record contracts](record-contracts.md) says what every task carries. This reference says where tasks live. The choice is a project decision (the "Task backend" record in `docs/decisions/`, created at init) and is declared as `tasks:` in `workspace.yaml`, which tooling reads. The default is `markdown`. Propose Beads when `bd` is on PATH and the project needs computed ready-work, typed dependencies, or atomic claims.
+The task contract in [the record contracts](record-contracts.md) says what every task carries. This reference says where tasks live. The choice is a project decision (the "Task backend" record in `docs/decisions/`, created at init) and is declared as `tasks:` in `workspace.yaml`, which tooling reads. The default is `markdown`. Propose Beads when `bd` is on PATH and the project needs computed ready-work, typed dependencies, or atomic claims. Changing backend later is a new decision record superseding the task-backend one, an edit to `workspace.yaml`, and a migration of the open tasks.
 
 ## Markdown (`tasks: markdown`)
 
@@ -49,4 +49,30 @@ Rules:
 
 ## Beads (`tasks: beads`)
 
-Not yet supported by `init_workspace.py`; the Beads backend arrives in a later release and `--tasks beads` exits with a message until then. The documented shape will be `bd init --skip-agents` (the workspace owns `AGENTS.md`), the JSONL export committed as the human-readable mirror, the loop `bd ready` → `bd update --claim` → `bd close`, and the same `bd` version on every machine.
+[Beads](https://github.com/gastownhall/beads) (`bd`) is a graph issue tracker for agents: typed dependencies, computed ready-work, atomic claims, and setup recipes for most harnesses. Verified against `bd` 1.1.0 and the 1.3 CLI reference; re-check flags after upgrading.
+
+**Requirements.** The workspace root is a git repository with a remote. `bd` is on PATH at the **same version on every machine** that works the project (a newer `bd` migrates the database in place and an older one then refuses it); record the version in `memory-bank/techContext.md`. Nothing else is needed: the embedded engine starts on demand.
+
+**What init does** (`init_workspace.py --tasks beads --apply`; preview prints the same commands without running them):
+
+```bash
+bd init --prefix <prefix> --skip-agents --skip-hooks --non-interactive --quiet
+bd config set export.auto true
+bd config set export.git-add true
+bd create "Confirm and complete project foundation" --type task --priority 1 --acceptance "..." --silent
+bd export -o .beads/issues.jsonl
+```
+
+`--skip-agents` because the workspace owns `AGENTS.md` (its Tasks section carries the Beads block); `--skip-hooks` because the workspace does not install git hooks. `bd init` wires the Dolt remote from the git origin by itself and makes one local commit with `.beads/{.gitignore,README.md,config.yaml,interactions.jsonl,metadata.json}` and a root `.gitignore`; push it like any commit. The prefix defaults to a slug of the project name (`--beads-prefix` overrides) and becomes the issue ID prefix (`orchard-3kf`).
+
+**Where the data lives.** The database is a Dolt directory under `.beads/` (ignored by git). Its history is pushed with `bd dolt push` to the **same git remote** under the custom ref `refs/dolt/data`; verified on GitHub, which retains the ref and serves it to `bd bootstrap`. A plain `git clone` does not fetch it: **run `bd bootstrap` once in every fresh clone.** Beads also pushes a branch named `__dolt_remote_info__`; expect it in the branch list and exclude it from branch rules that match `*`. `.beads/issues.jsonl` is refreshed after writes (`export.auto`, throttled to once a minute) and staged (`export.git-add`); it is the human-readable mirror, not the sync mechanism.
+
+**Loop.** `bd prime` prints the workflow context (about 1–2k tokens). Then: `bd ready --json` → `bd update <id> --claim` → work → `bd close <id> --reason "<evidence>"` → `bd dolt push`. Discovered work: `bd create "<title>" --type task --deps discovered-from:<id>`. Several agents or sessions on one machine need an external Dolt server (`bd init --server`); the embedded engine is single-writer.
+
+**Task contract mapping.** ID → Beads ID; owner → `assignee` (one); status → `open | in_progress | blocked | deferred | closed`, with `review` as the label `status:review` until the close policy is configured; priority → P0–P4 (`urgent`=0, `high`=1, `normal`=2, `low`=3); dependencies → typed deps (`blocks` by default); acceptance criteria → `--acceptance`; approval state → label `approval:<state>` and the packet path in `--external-ref`; evidence → `bd note <id>`; next action → the first line of the description or a `next:` note; known issues → `--type bug`.
+
+**Recovery without the Dolt history.** `.beads/issues.jsonl` holds every issue with labels, dependencies, and comments, readable as plain text. To rebuild a database from it: `bd init --prefix <prefix> --skip-agents --skip-hooks --non-interactive --quiet && bd import .beads/issues.jsonl` (upsert; comments and history on the Dolt side are lost, the task list is not). `bd export` is not a full backup; `bd backup` is, if Dolt-level restore matters.
+
+**Telemetry.** `bd` sends anonymous metrics by default. Init runs its own `bd` calls with `DO_NOT_TRACK=1`; to disable globally run `bd metrics off` or export `DO_NOT_TRACK=1`.
+
+**What the validator checks.** `tasks: beads` requires `.beads/` and `.beads/issues.jsonl` and forbids a root `TASKS.md`.
