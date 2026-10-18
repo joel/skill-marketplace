@@ -23,6 +23,7 @@ def normalise(relative: str) -> str:
     relative = re.sub(r"^sessions/\d{4}/\d{2}/[^/]+-session\.md$", "sessions/YYYY/MM/SESSION", relative)
     relative = re.sub(r"^sessions/\d{4}/\d{2}$", "sessions/YYYY/MM", relative)
     relative = re.sub(r"^sessions/\d{4}$", "sessions/YYYY", relative)
+    relative = re.sub(r"^docs/decisions/\d{4}-[a-z0-9-]+\.md$", "docs/decisions/NNNN-title.md", relative)
     return relative
 
 

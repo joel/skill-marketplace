@@ -42,7 +42,7 @@ Root files hold shared, cross-agent material. Agent directories hold role-specif
 | Agent `POLICIES.md` | Role-specific authority and constraints, narrower than root `POLICIES.md` | Controlled change |
 | Agent `STATE.md` | Current role state and priorities | Continuously maintained |
 | Agent `TASKS.md` | The agent's owned queue; cross-agent initiatives stay in root `TASKS.md` | Continuously maintained |
-| Agent `DECISIONS.md` | Role-scoped durable decisions | Append or supersede |
+| Agent `DECISIONS.md` | Index of the decision records this agent owns; the records themselves are ADRs in root `docs/decisions/` with the scope stated in their context | Append |
 | Agent `inbox/`, `outbox/` | Messages to and from this agent | Append-only |
 | Agent `handoffs/` | Hand-offs this agent has sent | Append-only once acknowledged |
 | Agent `sessions/`, `summaries/`, `artifacts/`, `archive/` | As in the standard, scoped to the agent | As in the standard |
@@ -113,7 +113,7 @@ States: `proposed` (defined, not yet confirmed), `active`, `paused` (no work exp
 ## Sources of truth
 
 - ../../AGENTS.md
-- ../../ABOUT.md, ../../STATE.md, ../../TASKS.md, ../../DECISIONS.md
+- ../../ABOUT.md, ../../STATE.md, ../../TASKS.md, ../../docs/decisions/
 - ../REGISTRY.md
 - This agent workspace
 
@@ -132,7 +132,7 @@ Before meaningful work:
 1. Read `../../AGENTS.md`.
 2. Read `../../ABOUT.md` and `../../STATE.md`.
 3. Read `../../POLICIES.md`, then `ABOUT.md` and `POLICIES.md` here.
-4. Read `../../DECISIONS.md` and `DECISIONS.md` here.
+4. Read `../../docs/decisions/README.md`, open only the accepted records relevant to the task, and read `DECISIONS.md` here.
 5. Read `TASKS.md` here and the entries in `../../TASKS.md` that name this agent; confirm owner, acceptance criteria, dependencies, blockers, and approval state.
 6. Read `inbox/` for unacknowledged messages and hand-offs addressed to this agent.
 7. Read the current monthly summary here, when one exists.
@@ -144,7 +144,7 @@ Do not trust remembered information unless it is verified against the workspace 
 
 A coordinator's `WARM_ME_UP.md` adds, after step 5: read `../REGISTRY.md` and check for unowned, stale, blocked, overdue, or conflicting work across agents.
 
-`POLICIES.md` starts with "Follow `../../POLICIES.md`." and then lists only what is narrower for this role: permitted actions, actions needing approval, prohibitions, and the tool and data scope actually granted. `STATE.md`, `TASKS.md`, and `DECISIONS.md` use the root templates and record contracts unchanged, scoped to the agent; the agent's `TASKS.md` lists the IDs it owns and links cross-agent tasks that live in root `TASKS.md` rather than copying them.
+`POLICIES.md` starts with "Follow `../../POLICIES.md`." and then lists only what is narrower for this role: permitted actions, actions needing approval, prohibitions, and the tool and data scope actually granted. `STATE.md` and `TASKS.md` use the root templates and record contracts unchanged, scoped to the agent; the agent's `TASKS.md` lists the IDs it owns and links cross-agent tasks that live in root `TASKS.md` rather than copying them. The agent's `DECISIONS.md` lists and links the records in root `docs/decisions/` that this agent owns; it holds no decision text of its own.
 
 ## Coordination
 

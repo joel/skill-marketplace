@@ -26,7 +26,7 @@ Initialise a vendor-neutral workspace.
 
 ## Decisions made or proposed
 
-- `DEC-0001` records the vendor-neutral workspace decision.
+- `{{ADR_0001_ID}}` (`docs/decisions/{{ADR_0001_FILE}}`) records the vendor-neutral workspace decision, status accepted.
 
 ## Files created or modified
 
