@@ -4,6 +4,8 @@ A v1 workspace has `project/{ABOUT,POLICIES,STATE,TASKS,DECISIONS}.md`, `agents/
 
 The script does the mechanical part. You do the judgement part, guided by the `<!-- MIGRATION: ... -->` markers it leaves. Nothing is deleted: every consumed v1 file is under `archive/v1/`, and `archive/v1/MIGRATION-MANIFEST.md` lists each v1 path, what happened to it, and where it went.
 
+In Claude Code the whole of this guide runs as one command from the project root: `/vendor-neutral-workspace:migrate [--tasks markdown|beads] [--auto] [--commit]`. It previews, waits for a go-ahead (unless `--auto`), applies, resolves the markers with conservative defaults, lists the calls that need the owner under "Decisions to confirm" in the session record, validates, records, and commits when asked. The steps below are what it does, for other harnesses or for doing it by hand.
+
 ## 1. Run the script
 
 ```bash
