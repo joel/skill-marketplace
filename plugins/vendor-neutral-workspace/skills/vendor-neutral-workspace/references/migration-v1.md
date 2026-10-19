@@ -15,6 +15,8 @@ python3 scripts/migrate_v1.py --root /path/to/project --apply    # perform
 
 Options: `--agent-id` when several agents exist (the others are archived whole; re-create any that must stay from the multi-agent extension), `--project` when `project/ABOUT.md` has no `# Project — <name>` heading, `--tasks beads` to land on the Beads backend (the merged task list then goes to `archive/v1/TASKS.md` for you to create in Beads).
 
+Approval packets that v1 kept under `decisions/` move to `approvals/` with their names unchanged; the script repoints `decisions/APPROVAL-…` references in the brief, tasks, policies and decision records, and leaves closed session records as written (the manifest maps the move). New packets follow the contract name `approvals/<task-id>-<YYYY-MM-DD>.md`.
+
 Read the preview before applying. The script never overwrites: a v2 target that already exists is skipped and the v1 source is archived instead.
 
 ## 2. Resolve the markers, in this order

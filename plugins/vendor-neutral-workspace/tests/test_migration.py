@@ -98,6 +98,12 @@ class Migration(unittest.TestCase):
         self.assertIn("FIX-0002", tasks)
         self.assertIn("Agent queue (migrated", tasks)
 
+        # Approval packets that v1 kept under decisions/ are in approvals/, references follow, v1 dir gone.
+        self.assertTrue((self.root / "approvals" / "APPROVAL-FIX-0002-store-swap.md").is_file())
+        self.assertIn("approvals/APPROVAL-FIX-0002-store-swap.md", tasks)
+        self.assertNotIn("decisions/APPROVAL-", tasks)
+        self.assertFalse((self.root / "decisions").exists())
+
         # The v2 validator accepts the result, warning only about the markers left for the agent.
         validated = run("validate_workspace.py", "--root", str(self.root))
         self.assertEqual(validated.returncode, 0, validated.stdout)

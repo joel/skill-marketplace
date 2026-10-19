@@ -97,6 +97,12 @@ harness: `scripts/migrate_v1.py --root <dir>` for a preview, then `--apply`,
 then `references/migration-v1.md`. Nothing is deleted; everything consumed
 lands under `archive/v1/` with a manifest.
 
+### vendor-neutral-workspace 2.1.1 (2026-10-19)
+
+The migration moves approval packets that v1 kept under `decisions/` to
+`approvals/` and repoints the references to them; before, they were left
+behind and absent from the manifest.
+
 ### vendor-neutral-workspace 2.1.0 (2026-10-19)
 
 Adds the `/vendor-neutral-workspace:migrate [--tasks markdown|beads] [--auto]

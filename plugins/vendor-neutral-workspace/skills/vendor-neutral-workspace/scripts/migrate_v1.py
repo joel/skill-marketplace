@@ -29,6 +29,11 @@ def mark(text: str) -> str:
     return f"<!-- MIGRATION: {text} -->"
 
 
+def repoint(text: str) -> str:
+    """v1 kept approval packets under decisions/; v2 keeps them under approvals/ with the same names."""
+    return text.replace("decisions/APPROVAL-", "approvals/APPROVAL-")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--root", required=True, type=Path, help="v1 workspace directory")
@@ -227,6 +232,13 @@ def main() -> int:
         m.move_tree(agent_dir / sub, root / ARCHIVE / "agents" / agent_id / sub, "archived")
     for sub in ("inbox", "outbox"):
         m.move_tree(root / sub, root / ARCHIVE / sub, "archived")
+    # Approval packets that v1 kept under decisions/ move to approvals/ with their names; anything else there is archived.
+    decisions_v1 = root / "decisions"
+    for path in sorted(p for p in decisions_v1.rglob("*") if p.is_file()) if decisions_v1.is_dir() else []:
+        if path.name.startswith("APPROVAL-") and path.suffix == ".md":
+            m.move(path, root / "approvals" / path.relative_to(decisions_v1), "moved (approval packet)")
+        else:
+            m.move(path, root / ARCHIVE / "decisions" / path.relative_to(decisions_v1), "archived")
     for other in agents:
         if other != agent_dir:
             m.move_tree(other, root / ARCHIVE / "agents" / other.name, "archived (second agent)")
@@ -237,10 +249,10 @@ def main() -> int:
         root / "memory-bank" / "projectbrief.md",
         f"# Project brief — {project}\n\n{header}"
         f"{mark('split product context (why it exists, problems, how it should work, UX goals) into productContext.md, then delete this line')}\n\n"
-        f"{body(about)}",
+        f"{body(repoint(about))}",
         [root / "project" / "ABOUT.md"], "converted",
     )
-    project_state, agent_state = read(root / "project" / "STATE.md"), read(agent_dir / "STATE.md")
+    project_state, agent_state = repoint(read(root / "project" / "STATE.md")), repoint(read(agent_dir / "STATE.md"))
     m.write(
         root / "memory-bank" / "activeContext.md",
         f"# Active context — {project}\n\n{header}"
@@ -248,7 +260,7 @@ def main() -> int:
         f"{body(project_state)}\n## Agent state (migrated from agents/{agent_id}/STATE.md)\n\n{body(agent_state)}",
         [root / "project" / "STATE.md", agent_dir / "STATE.md"], "merged",
     )
-    project_policies, agent_policies = read(root / "project" / "POLICIES.md"), read(agent_dir / "POLICIES.md")
+    project_policies, agent_policies = repoint(read(root / "project" / "POLICIES.md")), repoint(read(agent_dir / "POLICIES.md"))
     m.write(
         root / "POLICIES.md",
         f"# Policies — {project}\n\n{body(project_policies)}\n"
@@ -256,7 +268,7 @@ def main() -> int:
         f"{mark('fold these role rules into the sections above where they are narrower than the baseline, then delete this line')}\n\n{body(agent_policies)}",
         [root / "project" / "POLICIES.md", agent_dir / "POLICIES.md"], "merged",
     )
-    project_tasks, agent_tasks = read(root / "project" / "TASKS.md"), read(agent_dir / "TASKS.md")
+    project_tasks, agent_tasks = repoint(read(root / "project" / "TASKS.md")), repoint(read(agent_dir / "TASKS.md"))
     merged_tasks = (
         f"# Tasks — {project}\n\n{body(project_tasks)}\n"
         f"## Agent queue (migrated from agents/{agent_id}/TASKS.md)\n\n"
@@ -280,8 +292,8 @@ def main() -> int:
     ):
         m.archive(path)
     decisions_sources = {
-        "project/DECISIONS.md": read(root / ARCHIVE / "project" / "DECISIONS.md") if args.apply else read(root / "project" / "DECISIONS.md"),
-        f"agents/{agent_id}/DECISIONS.md": read(root / ARCHIVE / "agents" / agent_id / "DECISIONS.md") if args.apply else read(agent_dir / "DECISIONS.md"),
+        "project/DECISIONS.md": repoint(read(root / ARCHIVE / "project" / "DECISIONS.md") if args.apply else read(root / "project" / "DECISIONS.md")),
+        f"agents/{agent_id}/DECISIONS.md": repoint(read(root / ARCHIVE / "agents" / agent_id / "DECISIONS.md") if args.apply else read(agent_dir / "DECISIONS.md")),
     }
 
     # 5. init creates what v2 adds and skips everything written above.
