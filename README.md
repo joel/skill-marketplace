@@ -88,11 +88,20 @@ index; tasks in `TASKS.md` or in Beads, chosen at init and declared in
 of the boot sequence and block ending a session once when no session record
 was written.
 
-Existing v1 workspaces: ask Claude to adopt the project, or run
-`scripts/migrate_v1.py --root <dir>` from the installed skill for a preview,
-then `--apply`, and follow `references/migration-v1.md` for the judgement
-calls the script leaves as `<!-- MIGRATION: ... -->` markers. Nothing is
-deleted; everything consumed lands under `archive/v1/` with a manifest.
+Existing v1 workspaces: in the project root, run
+`/vendor-neutral-workspace:migrate` (2.1.0). It previews, waits for your
+go-ahead (`--auto` skips the pause), applies, resolves the judgement markers
+with conservative defaults and lists the calls that need you in the session
+record, validates, and commits with `--commit`. By hand or in another
+harness: `scripts/migrate_v1.py --root <dir>` for a preview, then `--apply`,
+then `references/migration-v1.md`. Nothing is deleted; everything consumed
+lands under `archive/v1/` with a manifest.
+
+### vendor-neutral-workspace 2.1.0 (2026-10-19)
+
+Adds the `/vendor-neutral-workspace:migrate [--tasks markdown|beads] [--auto]
+[--commit]` command, so a v1 workspace is upgraded with one command instead
+of a multi-step prompt.
 
 ## Local development (iterate without touching the install)
 
