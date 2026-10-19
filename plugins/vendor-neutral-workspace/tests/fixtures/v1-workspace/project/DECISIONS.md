@@ -56,6 +56,8 @@ The pilot ran on SQLite; concurrent writers from two agents corrupted the file t
 
 Use PostgreSQL 16 for all persistent application data.
 
+Connection pooling goes through pgbouncer in front of the primary; the application never opens direct connections.
+
 ### Reasons
 
 - Concurrent writers are safe.
@@ -75,12 +77,12 @@ Use PostgreSQL 16 for all persistent application data.
 
 - artifacts/sqlite-corruption-2026-09.md
 
-## DEC-0003 — Use SQLite for the pilot
+## DEC-0003 — Use SQLite for the pilot while the team is a single developer
 
 - Date: 2026-07-02
 - Status: superseded
 - Owner: main
-- Approver: not-required
+- Approver: main
 - Supersedes: none
 - Superseded-by: DEC-0002
 - Review: none

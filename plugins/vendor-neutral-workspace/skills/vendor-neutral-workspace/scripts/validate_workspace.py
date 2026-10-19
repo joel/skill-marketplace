@@ -42,6 +42,8 @@ SESSION_GLOB = "[0-9][0-9][0-9][0-9]/[0-9][0-9]/*-session.md"
 AGENT_ID_PATTERN = r"[a-z0-9]+(?:-[a-z0-9]+)*"
 
 TASK_BACKENDS = ("markdown", "beads")
+TASK_STATUSES = ("proposed", "ready", "in-progress", "waiting", "blocked", "review", "completed", "cancelled", "archived")
+APPROVAL_STATES = ("not-required", "required", "requested", "approved", "rejected")
 
 ADR_DIR = "docs/decisions"
 ADR_INDEX = "README.md"
@@ -81,11 +83,11 @@ def check_agent(root: Path, errors: list[str], warnings: list[str]) -> str | Non
     return match.group(1)
 
 
-def check_workspace_yaml(root: Path, agent_id: str | None, errors: list[str]) -> None:
+def check_workspace_yaml(root: Path, agent_id: str | None, errors: list[str]) -> dict[str, str]:
     """workspace.yaml is authoritative for tooling; it must agree with the files on disk."""
     config = read_workspace_yaml(root / "workspace.yaml")
     if not config:
-        return  # the missing-file error is reported by ROOT_FILES
+        return config  # the missing-file error is reported by ROOT_FILES
     if config.get("schema") != "2":
         errors.append(f"workspace.yaml: schema must be 2 (got {config.get('schema', 'nothing')})")
     if agent_id and config.get("agent") != agent_id:
@@ -94,7 +96,7 @@ def check_workspace_yaml(root: Path, agent_id: str | None, errors: list[str]) ->
     tasks = config.get("tasks")
     if tasks not in TASK_BACKENDS:
         errors.append(f"workspace.yaml: tasks must be one of {', '.join(TASK_BACKENDS)} (got {tasks or 'nothing'})")
-        return
+        return config
     if tasks == "markdown":
         if not (root / "TASKS.md").is_file():
             errors.append("missing required file: TASKS.md (tasks: markdown)")
@@ -107,6 +109,38 @@ def check_workspace_yaml(root: Path, agent_id: str | None, errors: list[str]) ->
             errors.append("missing .beads/issues.jsonl (tasks: beads); run `bd export -o .beads/issues.jsonl`")
         if (root / "TASKS.md").exists():
             errors.append("workspace.yaml says tasks: beads but TASKS.md exists")
+    return config
+
+
+def check_tasks_markdown(root: Path, warnings: list[str]) -> None:
+    """Each task in TASKS.md carries the contract's fields with vocabulary values; a packet it names exists."""
+    path = root / "TASKS.md"
+    if not path.is_file():
+        return
+    text = path.read_text(encoding="utf-8", errors="replace")
+    for block in re.split(r"(?m)^(?=### )", text)[1:]:
+        heading = re.match(r"### (\S+)", block)
+        status = re.search(r"(?m)^- Status:\s*(\S*)", block)
+        if not heading or not status:
+            continue
+        task = heading.group(1)
+        token = re.match(r"[a-z-]+", status.group(1))
+        if not token or token.group(0) not in TASK_STATUSES:
+            warnings.append(f"task {task}: status '{status.group(1)}' not in vocabulary")
+        approval = re.search(r"(?m)^- Approval:\s*(\S*)", block)
+        if approval:
+            token = re.match(r"[a-z-]+", approval.group(1))
+            if not token or token.group(0) not in APPROVAL_STATES:
+                warnings.append(f"task {task}: approval '{approval.group(1)}' not in vocabulary")
+        packet = re.search(r"(?m)^- Approval-packet:\s*(.*)$", block)
+        if not packet:
+            warnings.append(f"task {task}: no Approval-packet line")
+        elif packet.group(1).strip().startswith("unknown"):
+            warnings.append(f"task {task}: Approval-packet unknown (write the packet or set none)")
+        else:
+            for named in re.findall(r"approvals/[A-Za-z0-9._-]+\.md", packet.group(1)):
+                if not (root / named).is_file():
+                    warnings.append(f"task {task}: approval packet not found: {named}")
 
 
 def check_decisions(root: Path, errors: list[str], warnings: list[str]) -> None:
@@ -163,6 +197,10 @@ def main() -> int:
         print("ERROR v1 layout detected (project/ and agents/): run scripts/migrate_v1.py --root <root>, then follow references/migration-v1.md")
         print("summary: errors=1 warnings=0")
         return 1
+    if (root / "company").is_dir() and (root / "agents").is_dir() and not (root / "project").is_dir():
+        print("ERROR pre-v1 Agent OS layout detected (company/ and agents/): put a copy under git, then follow references/migration-v1.md; migrate_v1.py expects project/ and a single agents/<id>/")
+        print("summary: errors=1 warnings=0")
+        return 1
 
     for relative in ROOT_FILES:
         if not (root / relative).is_file():
@@ -173,7 +211,9 @@ def main() -> int:
             errors.append(f"missing required directory: {relative}")
 
     agent_id = check_agent(root, errors, warnings)
-    check_workspace_yaml(root, agent_id, errors)
+    config = check_workspace_yaml(root, agent_id, errors)
+    if config.get("tasks") == "markdown":
+        check_tasks_markdown(root, warnings)
 
     for relative in MEMORY_BANK_FILES:
         path = root / relative

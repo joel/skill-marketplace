@@ -34,6 +34,11 @@ class Migration(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.root = Path(self._tmp.name) / "ws"
         shutil.copytree(FIXTURE, self.root)
+        # Junk and duplicate placeholders as found in real v1 trees.
+        (self.root / "agents" / "main" / "sessions" / ".DS_Store").write_bytes(b"\x00")
+        (self.root / "summaries" / "monthly").mkdir(parents=True, exist_ok=True)
+        (self.root / "summaries" / "monthly" / ".gitkeep").write_text("", encoding="utf-8")
+        (self.root / "agents" / "main" / "summaries" / "monthly" / ".gitkeep").write_text("", encoding="utf-8")
         self.v1_files = files_under(self.root)
 
     def tearDown(self) -> None:
@@ -61,12 +66,15 @@ class Migration(unittest.TestCase):
 
         # Every v1 file appears in the manifest (the DEC blocks appear as path#DEC-NNNN rows).
         sources = {src.split("#", 1)[0] for src, _, _ in rows}
-        missing = sorted(self.v1_files - sources)
+        missing = sorted(self.v1_files - sources - {"summaries/monthly/.gitkeep"})  # the root placeholder stays in place
         self.assertEqual(missing, [], f"v1 files absent from the manifest: {missing}")
 
-        # Every v2 target exists.
-        absent = sorted(dst for _, _, dst in rows if not (self.root / dst).exists())
+        # Every v2 target exists; dropped junk has no target.
+        absent = sorted(dst for _, _, dst in rows if dst != "(none)" and not (self.root / dst).exists())
         self.assertEqual(absent, [], f"manifest targets that do not exist: {absent}")
+        self.assertIn("| agents/main/sessions/.DS_Store | dropped (Finder metadata) | (none) |", manifest)
+        self.assertIn("| agents/main/summaries/monthly/.gitkeep | dropped (placeholder; directory exists) | (none) |", manifest)
+        self.assertFalse(list((self.root / "sessions").rglob(".DS_Store")))
 
         # Markers where judgement is needed, and the v1 tree gone.
         markers = sum(
@@ -85,8 +93,15 @@ class Migration(unittest.TestCase):
         self.assertEqual(names[:2], ["0001-use-a-vendor-neutral-workspace.md", "0002-task-backend.md"])
         postgres = next(p for p in decisions.glob("*keep-postgresql*"))
         sqlite = next(p for p in decisions.glob("*use-sqlite*"))
-        self.assertIn('status: "accepted"', postgres.read_text(encoding="utf-8"))
-        self.assertRegex(sqlite.read_text(encoding="utf-8"), r'status: "superseded by ADR-\d{4}"')
+        postgres_text, sqlite_text = postgres.read_text(encoding="utf-8"), sqlite.read_text(encoding="utf-8")
+        self.assertIn('status: "accepted"', postgres_text)
+        self.assertRegex(sqlite_text, r'status: "superseded by ADR-\d{4}"')
+        # The whole v1 decision text is carried, not just its first line; makers are not duplicated;
+        # a long title is cut between words; provenance keeps the v1 id.
+        self.assertIn("pgbouncer", postgres_text)
+        self.assertIn("decision-makers: main\n", sqlite_text)
+        self.assertEqual(sqlite.name[5:], "use-sqlite-for-the-pilot-while-the-team-is-a-single.md")
+        self.assertIn("Migrated from v1 `DEC-0003`", sqlite_text)
         index = (decisions / "README.md").read_text(encoding="utf-8")
         self.assertIn(postgres.name, index)
         self.assertIn(sqlite.name, index)
@@ -97,6 +112,27 @@ class Migration(unittest.TestCase):
         tasks = (self.root / "TASKS.md").read_text(encoding="utf-8")
         self.assertIn("FIX-0002", tasks)
         self.assertIn("Agent queue (migrated", tasks)
+
+        # Completed tasks left under Active are under Completed; every task has an Approval-packet line;
+        # v1 ids and agent-relative paths are repointed in the live file.
+        self.assertLess(tasks.index("### FIX-0002"), tasks.index("## Completed"))
+        self.assertLess(tasks.index("## Completed"), tasks.index("### FIX-0001"))
+        self.assertLess(tasks.index("### FIX-0001"), tasks.index("## Agent queue"))
+        self.assertIn("- Approval: not-required\n- Approval-packet: none\n", tasks)
+        self.assertIn("- Approval: owner said yes in chat\n- Approval-packet: unknown\n", tasks)
+        self.assertIn("- Approval-packet: approvals/APPROVAL-FIX-0002-store-swap.md\n", tasks)
+        self.assertIn("- Evidence: sessions/2026/09/30-120000Z-session.md", tasks)
+        self.assertNotIn("agents/main/", tasks.split("## Agent queue")[0])
+        self.assertRegex(tasks, r"see ADR-\d{4}\.")
+        self.assertNotIn("DEC-0003", tasks)
+        self.assertIn("- Evidence: docs/decisions/\n", tasks)
+
+        # The agent block carries the v1 profile; the merged state has one Updated header.
+        agents_md = (self.root / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("- Created: 2026-10-18 (v1 workspace); migrated to v2 on ", agents_md)
+        self.assertIn("- Name: Main\n- Role: Coordinator\n", agents_md)
+        active = (self.root / "memory-bank" / "activeContext.md").read_text(encoding="utf-8")
+        self.assertEqual(active.count("- Updated:"), 1)
 
         # Approval packets that v1 kept under decisions/ are in approvals/, references follow, v1 dir gone.
         self.assertTrue((self.root / "approvals" / "APPROVAL-FIX-0002-store-swap.md").is_file())
@@ -109,6 +145,15 @@ class Migration(unittest.TestCase):
         self.assertEqual(validated.returncode, 0, validated.stdout)
         self.assertIn("errors=0", validated.stdout)
         self.assertIn("WARN  migration marker remains:", validated.stdout)
+
+    def test_validator_names_a_pre_v1_agent_os_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "company").mkdir()
+            (root / "company" / "ABOUT.md").write_text("# Company\n", encoding="utf-8")
+            (root / "agents" / "chief").mkdir(parents=True)
+            out = run("validate_workspace.py", "--root", str(root)).stdout
+            self.assertIn("ERROR pre-v1 Agent OS layout detected (company/ and agents/)", out)
 
     def test_apply_twice_is_refused_because_the_layout_is_no_longer_v1(self) -> None:
         self.assertEqual(run("migrate_v1.py", "--root", str(self.root), "--apply").returncode, 0)

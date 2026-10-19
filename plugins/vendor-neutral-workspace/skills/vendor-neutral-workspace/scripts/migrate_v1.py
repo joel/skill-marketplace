@@ -22,6 +22,8 @@ HERE = Path(__file__).resolve().parent
 ARCHIVE = Path("archive/v1")
 MANIFEST = ARCHIVE / "MIGRATION-MANIFEST.md"
 V1_STATUS = {"active": "accepted", "proposed": "proposed", "rejected": "rejected"}
+DONE_STATUSES = ("completed", "cancelled", "archived")
+JUNK = {".DS_Store", "Thumbs.db"}
 ADR_FILENAME = re.compile(r"(?P<number>\d{4})-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md")
 
 
@@ -53,16 +55,82 @@ def read(path: Path) -> str:
 
 
 def body(text: str) -> str:
-    """Drop the first heading line of a v1 file; keep the rest."""
+    """Drop the first heading line and the Updated/Updated-by metadata of a v1 file; keep the rest."""
     lines = text.splitlines()
     if lines and lines[0].startswith("# "):
+        lines = lines[1:]
+    while lines and (not lines[0].strip() or re.match(r"- Updated(?:-by)?:", lines[0])):
         lines = lines[1:]
     return "\n".join(lines).strip() + "\n"
 
 
 def slugify(title: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
-    return slug[:60].rstrip("-") or "decision"
+    if len(slug) > 60:
+        cut = slug.rfind("-", 0, 61)  # cut between words, never inside one
+        slug = slug[:cut] if cut > 0 else slug[:60]
+    return slug.rstrip("-") or "decision"
+
+
+def agent_profile(text: str) -> dict[str, str]:
+    """Name, role and creation date from a v1 agents/<id>/ABOUT.md."""
+    profile: dict[str, str] = {}
+    heading = re.match(r"# (.+)", text)
+    if heading:
+        profile["name"] = heading.group(1).strip()
+    for key, pattern in (("role", r"^- Role:\s*(.+)$"), ("created", r"^- Created:\s*(\d{4}-\d{2}-\d{2})")):
+        found = re.search(pattern, text, re.MULTILINE)
+        if found:
+            profile[key] = found.group(1).strip()
+    return profile
+
+
+def add_packet_lines(text: str) -> tuple[str, int]:
+    """Every `- Approval:` line gets an `- Approval-packet:` line: the paths it names, `none` when
+    not required, otherwise `unknown` for the agent to resolve."""
+    lines = text.splitlines()
+    out: list[str] = []
+    added = 0
+    for index, line in enumerate(lines):
+        out.append(line)
+        match = re.match(r"- Approval:\s*(.*)", line)
+        if not match or (index + 1 < len(lines) and lines[index + 1].startswith("- Approval-packet:")):
+            continue
+        value = match.group(1)
+        paths = re.findall(r"approvals/[A-Za-z0-9._-]+\.md", value)
+        if paths:
+            packet = ", ".join(paths)
+        elif value.strip().startswith("not-required"):
+            packet = "none"
+        else:
+            packet = "unknown"
+        out.append(f"- Approval-packet: {packet}")
+        added += 1
+    return "\n".join(out) + ("\n" if text.endswith("\n") else ""), added
+
+
+def move_completed_tasks(text: str) -> tuple[str, int]:
+    """Task blocks under `## Active` whose status is completed, cancelled or archived move under
+    `## Completed` (created when absent)."""
+    active = re.search(r"(?ms)^## Active\n(.*?)(?=^## |\Z)", text)
+    if not active:
+        return text, 0
+    blocks = re.split(r"(?m)^(?=### )", active.group(1))
+    keep, moved = [blocks[0]], []
+    for block in blocks[1:]:
+        status = re.search(r"(?m)^- Status:\s*([a-z-]+)", block)
+        (moved if status and status.group(1) in DONE_STATUSES else keep).append(block)
+    if not moved:
+        return text, 0
+    new_active = "".join(keep).rstrip("\n") + "\n\n"
+    text = text[:active.start(1)] + new_active + text[active.end(1):]
+    moved_text = "".join(b.rstrip("\n") + "\n\n" for b in moved)
+    completed = re.search(r"(?m)^## Completed\n", text)
+    if completed:
+        text = text[:completed.end()] + "\n" + moved_text + text[completed.end():].lstrip("\n")
+    else:
+        text = text.rstrip("\n") + "\n\n## Completed\n\n" + moved_text
+    return text, len(moved)
 
 
 def parse_decisions(text: str) -> list[dict[str, object]]:
@@ -93,13 +161,15 @@ def render_adr(block: dict[str, object], source: str, id_map: dict[str, str]) ->
         status = V1_STATUS.get(v1_status, "proposed")
     makers = [fields.get("Owner", "").strip()]
     approver = fields.get("Approver", "").strip()
-    if approver and approver != "not-required":
+    if approver and approver != "not-required" and approver not in makers:
         makers.append(approver)
     def bullets(name: str) -> str:
         # v1 used "- " bullets; MADR uses "* ".
         return re.sub(r"(?m)^- ", "* ", sections.get(name, "").strip())
 
-    decision = (sections.get("Decision", "").strip() or "unknown").splitlines()[0].rstrip(".")
+    decision_lines = (sections.get("Decision", "").strip() or "unknown").splitlines()
+    decision = decision_lines[0].rstrip(".")
+    decision_rest = "\n".join(decision_lines[1:]).strip()  # v1 often continued the decision after its first line
     alternatives = bullets("Alternatives considered")
     reasons = bullets("Reasons")
     consequences = bullets("Consequences and risks")
@@ -126,7 +196,8 @@ def render_adr(block: dict[str, object], source: str, id_map: dict[str, str]) ->
         f"{alternatives}\n\n"
         "## Decision Outcome\n\n"
         f"Chosen option: \"{decision}\", because:\n\n{reasons or '* (reasons not recorded in v1)'}\n\n"
-        "### Consequences\n\n"
+        + (f"{decision_rest}\n\n" if decision_rest else "")
+        + "### Consequences\n\n"
         f"{consequences or '* none recorded'}\n\n"
         "### Confirmation\n\n"
         f"{evidence or 'none recorded'}\n\n"
@@ -140,6 +211,7 @@ class Migration:
         self.root = root
         self.apply = apply
         self.manifest: list[tuple[str, str, str]] = []
+        self.written: list[Path] = []
 
     def rel(self, path: Path) -> str:
         return path.relative_to(self.root).as_posix()
@@ -165,6 +237,7 @@ class Migration:
         if self.apply:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8", newline="\n")
+        self.written.append(target)
         for source in sources:
             self.manifest.append((self.rel(source), action, self.rel(target)))
 
@@ -172,23 +245,62 @@ class Migration:
         if source.is_file():
             self.move(source, self.root / ARCHIVE / self.rel(source), "archived")
 
+    def drop(self, source: Path, action: str) -> None:
+        """Finder metadata and redundant .gitkeep placeholders are not records."""
+        print(f"DROP {self.rel(source)}  ({action})")
+        if self.apply:
+            source.unlink()
+        self.manifest.append((self.rel(source), action, "(none)"))
+
     def move_tree(self, source_dir: Path, target_dir: Path, action: str = "moved") -> None:
         if not source_dir.is_dir():
             return
         for path in sorted(p for p in source_dir.rglob("*") if p.is_file()):
-            self.move(path, target_dir / path.relative_to(source_dir), action)
+            target = target_dir / path.relative_to(source_dir)
+            if path.name in JUNK:
+                self.drop(path, "dropped (Finder metadata)")
+            elif path.name == ".gitkeep" and target.parent.is_dir():
+                self.drop(path, "dropped (placeholder; directory exists)")
+            else:
+                self.move(path, target, action)
+
+    def _clear_junk(self, directory: Path) -> None:
+        for path in directory.iterdir():
+            if path.is_file() and path.name in JUNK:
+                path.unlink()
 
     def remove_empty_dirs(self, top: Path) -> None:
         if not top.is_dir():
             return
         for directory in sorted((p for p in top.rglob("*") if p.is_dir()), key=lambda p: len(p.parts), reverse=True):
-            if self.apply and not any(directory.iterdir()):
-                directory.rmdir()
+            if self.apply:
+                self._clear_junk(directory)
+                if not any(directory.iterdir()):
+                    directory.rmdir()
+        if self.apply:
+            self._clear_junk(top)
         if self.apply and not any(top.iterdir()):
             top.rmdir()
             print(f"REMOVE empty directory {self.rel(top)}")
         elif not self.apply:
             print(f"REMOVE empty directory {self.rel(top)} (after moves)")
+
+    def repoint(self, path: Path, replacements: list[tuple[re.Pattern[str], object]]) -> None:
+        """Rewrite v1 references in a file this run wrote; provenance lines are left alone."""
+        if not path.is_file():
+            return
+        count = 0
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for index, line in enumerate(lines):
+            if "migrated from" in line.lower():
+                continue
+            for pattern, replacement in replacements:
+                line, n = pattern.subn(replacement, line)  # type: ignore[arg-type]
+                count += n
+            lines[index] = line
+        if count:
+            path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+            print(f"REPOINT {self.rel(path)}  ({count} reference(s))")
 
 
 def main() -> int:
@@ -269,8 +381,14 @@ def main() -> int:
         [root / "project" / "POLICIES.md", agent_dir / "POLICIES.md"], "merged",
     )
     project_tasks, agent_tasks = repoint(read(root / "project" / "TASKS.md")), repoint(read(agent_dir / "TASKS.md"))
+    tasks_body, moved_done = move_completed_tasks(body(project_tasks))
+    tasks_body, packets_added = add_packet_lines(tasks_body)
+    if moved_done:
+        print(f"MOVE {moved_done} completed task(s) under ## Completed in TASKS.md")
+    if packets_added:
+        print(f"ADD {packets_added} Approval-packet line(s) in TASKS.md (unknown where the approval names no packet)")
     merged_tasks = (
-        f"# Tasks — {project}\n\n{body(project_tasks)}\n"
+        f"# Tasks — {project}\n\n{tasks_body}\n"
         f"## Agent queue (migrated from agents/{agent_id}/TASKS.md)\n\n"
         f"{mark('fold these entries into Active, Waiting, Known issues or Completed above; add Approval-packet lines; then delete this line')}\n\n{body(agent_tasks)}"
     )
@@ -296,15 +414,29 @@ def main() -> int:
         f"agents/{agent_id}/DECISIONS.md": repoint(read(root / ARCHIVE / "agents" / agent_id / "DECISIONS.md") if args.apply else read(agent_dir / "DECISIONS.md")),
     }
 
-    # 5. init creates what v2 adds and skips everything written above.
+    # 5. init creates what v2 adds and skips everything written above; the agent block comes from the v1 profile.
+    profile = agent_profile(read(root / ARCHIVE / "agents" / agent_id / "ABOUT.md") if args.apply else read(agent_dir / "ABOUT.md"))
     init_cmd = [sys.executable, str(HERE / "init_workspace.py"), "--root", str(root), "--project", project,
-                "--agent-id", agent_id, "--tasks", args.tasks] + (["--apply"] if args.apply else [])
+                "--agent-id", agent_id, "--tasks", args.tasks]
+    if profile.get("name"):
+        init_cmd += ["--agent-name", profile["name"]]
+    if profile.get("role"):
+        init_cmd += ["--role", profile["role"]]
+    init_cmd += ["--apply"] if args.apply else []
     print("RUN " + " ".join(init_cmd[1:]))
     if args.apply:
         result = subprocess.run(init_cmd, capture_output=True, text=True)
         if result.returncode != 0:
             print(result.stdout + result.stderr, file=sys.stderr)
             return result.returncode
+    if profile.get("created"):
+        print(f"PATCH AGENTS.md: Created {profile['created']} from agents/{agent_id}/ABOUT.md")
+        if args.apply:
+            agents_path = root / "AGENTS.md"
+            agents_text = agents_path.read_text(encoding="utf-8")
+            agents_path.write_text(
+                agents_text.replace(f"- Created: {today}", f"- Created: {profile['created']} (v1 workspace); migrated to v2 on {today}", 1),
+                encoding="utf-8", newline="\n")
 
     # 6. DEC-NNNN blocks become decision records; the vendor-neutral one is the template's ADR-0001.
     blocks = [(source, block) for source, text in decisions_sources.items() for block in parse_decisions(text)]
@@ -327,6 +459,7 @@ def main() -> int:
         print(f"WRITE docs/decisions/{filename}  (from {source}#{block['id']})")
         if args.apply:
             (decisions_dir / filename).write_text(render_adr(block, source, id_map), encoding="utf-8", newline="\n")
+            m.written.append(decisions_dir / filename)
         m.manifest.append((f"{source}#{block['id']}", "converted to decision record", f"docs/decisions/{filename}"))
         status = render_adr(block, source, id_map).split("\n", 2)[1].split(":", 1)[1].strip().strip('"')
         fields: dict[str, str] = block["fields"]  # type: ignore[assignment]
@@ -340,13 +473,37 @@ def main() -> int:
     elif index_rows:
         print(f"APPEND {len(index_rows)} row(s) to docs/decisions/README.md")
 
-    # 7. The generated AGENTS.md needs the project's own rules merged back in.
+    # 7. References in the files written above point at v1 paths and DEC ids; now that the records are
+    #    numbered, rewrite them. Closed session records and archived files keep their original text.
+    tasks_target = "TASKS.md" if args.tasks == "markdown" else ".beads/"
+    path_map = [
+        ("../../", ""),
+        (f"agents/{agent_id}/sessions/", "sessions/"), (f"agents/{agent_id}/summaries/", "summaries/"),
+        (f"agents/{agent_id}/artifacts/", "artifacts/"), (f"agents/{agent_id}/archive/", "archive/"),
+        ("project/ABOUT.md", "memory-bank/projectbrief.md"), ("project/STATE.md", "memory-bank/activeContext.md"),
+        (f"agents/{agent_id}/STATE.md", "memory-bank/activeContext.md"),
+        ("project/POLICIES.md", "POLICIES.md"), (f"agents/{agent_id}/POLICIES.md", "POLICIES.md"),
+        ("project/TASKS.md", tasks_target), (f"agents/{agent_id}/TASKS.md", tasks_target),
+        ("project/DECISIONS.md", "docs/decisions/"), (f"agents/{agent_id}/DECISIONS.md", "docs/decisions/"),
+        ("decisions/APPROVAL-", "approvals/APPROVAL-"),
+    ]
+    replacements: list[tuple[re.Pattern[str], object]] = [
+        (re.compile(r"(?<!archive/v1/)" + re.escape(old)), new) for old, new in path_map
+    ]
+    replacements.append((re.compile(r"\bDEC-(\d{4})\b"), lambda mt: id_map.get(mt.group(0), mt.group(0))))
+    if args.apply:
+        for target in m.written:
+            m.repoint(target, replacements)
+    else:
+        print("REPOINT v1 references (DEC ids, agents/<id>/ and project/ paths) in the converted files")
+
+    # 8. The generated AGENTS.md needs the project's own rules merged back in.
     print(f"APPEND migration marker to AGENTS.md")
     if args.apply:
         with (root / "AGENTS.md").open("a", encoding="utf-8") as handle:
             handle.write(f"\n{mark(f'merge project-specific rules from {ARCHIVE}/AGENTS.md and {ARCHIVE}/README.md, then delete this line')}\n")
 
-    # 8. Empty v1 directories go; the manifest records everything.
+    # 9. Empty v1 directories go; the manifest records everything.
     for top in (root / "project", root / "agents", root / "decisions", root / "inbox", root / "outbox"):
         m.remove_empty_dirs(top)
     manifest_text = (

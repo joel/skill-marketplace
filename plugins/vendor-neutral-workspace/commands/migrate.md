@@ -9,6 +9,8 @@ The skill's scripts are in `${CLAUDE_PLUGIN_ROOT}/skills/vendor-neutral-workspac
 
 ## 1. Preview
 
+Check the tree first: `git status --porcelain`. If it prints anything, the pending records (Markdown files, small artifacts) are committed as `Snapshot of records before the v2 migration` so the migration lands as its own diff; untracked files larger than about 50 MB or binary artifacts are listed and left for the owner, never staged. Without `--auto`, stop and propose that commit before going on; with `--auto`, make it.
+
 Run `python3 "${CLAUDE_PLUGIN_ROOT}/skills/vendor-neutral-workspace/scripts/migrate_v1.py" --root .` with `--tasks` when given. If it reports no v1 layout, say so and stop. Otherwise summarise the plan in at most ten lines: how many files move, are archived, are converted; which decision records will be created; the task backend; anything the preview flagged (a second agent, a missing project name). Unless `--auto` was passed, stop here and wait for a go-ahead.
 
 ## 2. Apply
@@ -19,8 +21,9 @@ Run the same command with `--apply`. Report the manifest path (`archive/v1/MIGRA
 
 Work through every `<!-- MIGRATION: ... -->` marker in the order the guide gives, deleting each marker line when its file is done:
 
+- The script has already moved the completed tasks, added `Approval-packet` lines, repointed the v1 ids and paths in the converted files, and filled the agent block from the v1 profile. Resolve every `Approval-packet: unknown` as the guide says, and delete the agent queue section when each of its IDs already has a full entry.
 - Decide from the files and the codebase whatever they answer: fill `memory-bank/systemPatterns.md` and `techContext.md` from the code; split product context out of `projectbrief.md` when the v1 text makes the split obvious; fold the agent policy into `POLICIES.md` where it is narrower; fold the agent task queue into the task sections; classify each migrated decision's consequences as Good or Bad where the wording is plain.
-- Where only the project owner can decide (an ambiguous brief-versus-product split, whether a migrated record is a decision or a rule, a task whose status is unclear), make the conservative choice: keep the text where it is, keep statuses as they were, leave the record `accepted` if it was `active`. Do not ask question by question. Collect every such call under a heading "Decisions to confirm" in the session record, one line each with your default and the alternative.
+- Where only the project owner can decide (an ambiguous brief-versus-product split, whether a migrated record is a decision or a rule, a task whose status is unclear), make the conservative choice: keep the text where it is, keep statuses as they were, leave the record `accepted` if it was `active`. Do not ask question by question. Collect every such call under a heading "Decisions to confirm" in the session record, one line each with your default and the alternative; the guide's section 4 lists the ones that recur. Create one task, `SETUP-NNNN — Confirm the v2 migration decisions`, owned by the agent and `waiting` on the owner, pointing at that list.
 - Merge project-specific rules from `archive/v1/AGENTS.md` and `archive/v1/README.md` into the matching v2 section of `AGENTS.md`; never restore the v1 boot sequence.
 - For the Beads backend, create each open task from `archive/v1/TASKS.md` with `bd create` (title, `--acceptance`, `--priority`, `--deps`), then `bd export -o .beads/issues.jsonl`.
 

@@ -32,6 +32,34 @@ Replace unknown initial values with verified project purpose, scope, outcomes, s
 
 Ask the project owner to confirm the project foundation.
 
+### FIX-0001 — Ship the SQLite pilot
+
+- Status: completed (superseded by FIX-0002)
+- Priority: normal
+- Owner: main
+- Created: 2026-07-02
+- Updated: 2026-09-12
+- Requested-by: project-owner
+- Depends-on: none
+- Approval: owner said yes in chat
+- Evidence: agents/main/sessions/2026/09/30-120000Z-session.md
+
+#### Objective
+
+Run the pilot on a single SQLite file, see DEC-0003.
+
+#### Acceptance criteria
+
+- Pilot users can log in.
+
+#### Blockers
+
+- none
+
+#### Next action
+
+None; superseded.
+
 ### FIX-0002 — Replace the SQLite pilot store
 
 - Status: in-progress

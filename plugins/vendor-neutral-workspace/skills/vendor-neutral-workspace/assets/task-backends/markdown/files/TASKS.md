@@ -32,3 +32,15 @@ Replace unknown initial values with verified project purpose, scope, outcomes, s
 #### Next action
 
 Ask the project owner to confirm the project foundation.
+
+## Waiting
+
+- None.
+
+## Known issues
+
+- None.
+
+## Completed
+
+- None.
