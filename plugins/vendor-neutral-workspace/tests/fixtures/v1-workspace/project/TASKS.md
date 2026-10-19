@@ -41,7 +41,7 @@ Ask the project owner to confirm the project foundation.
 - Updated: 2026-10-01
 - Requested-by: project-owner
 - Depends-on: none
-- Approval: not-required
+- Approval: approved (decisions/APPROVAL-FIX-0002-store-swap.md)
 - Evidence: project/DECISIONS.md
 
 #### Objective
