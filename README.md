@@ -97,6 +97,19 @@ harness: `scripts/migrate_v1.py --root <dir>` for a preview, then `--apply`,
 then `references/migration-v1.md`. Nothing is deleted; everything consumed
 lands under `archive/v1/` with a manifest.
 
+### vendor-neutral-workspace 2.2.0 (2026-10-19)
+
+Lessons from migrating two real v1 workspaces. The migration now carries the
+whole text of a v1 decision into its record, cuts long record names between
+words, deduplicates decision-makers, strips v1 metadata from merged files,
+adds `Approval-packet` lines, moves completed tasks under `## Completed`,
+repoints v1 ids and paths in the converted files, fills the agent block from
+the v1 profile, and drops Finder metadata and redundant `.gitkeep` files. The
+validator warns on task fields outside the contract and on missing packets,
+and names a pre-v1 "Agent OS" layout. The Markdown task template ships the
+`Waiting`, `Known issues` and `Completed` sections. The guide lists the owner
+calls that recur; the command checks for a dirty tree first.
+
 ### vendor-neutral-workspace 2.1.1 (2026-10-19)
 
 The migration moves approval packets that v1 kept under `decisions/` to

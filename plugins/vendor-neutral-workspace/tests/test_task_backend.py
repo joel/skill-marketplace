@@ -47,6 +47,30 @@ class MarkdownBackend(unittest.TestCase):
         self.assertIn("## Tasks\n\nTasks live in `TASKS.md`", agents)
         self.assertIn("errors=0", self.validate())
 
+    def test_template_ships_the_sections_agents_md_refers_to(self) -> None:
+        tasks = (self.root / "TASKS.md").read_text(encoding="utf-8")
+        for section in ("## Active", "## Waiting", "## Known issues", "## Completed"):
+            self.assertIn(section, tasks)
+        self.assertNotIn("WARN  task", self.validate())
+
+    def test_validator_warns_on_task_fields_outside_the_contract(self) -> None:
+        path = self.root / "TASKS.md"
+        tasks = path.read_text(encoding="utf-8")
+        tasks = tasks.replace("- Status: ready", "- Status: tracking (records live elsewhere)")
+        tasks = tasks.replace("- Approval: not-required", "- Approval: in-session nod from the owner")
+        tasks = tasks.replace("- Approval-packet: none", "- Approval-packet: unknown")
+        path.write_text(tasks, encoding="utf-8")
+        out = self.validate()
+        self.assertIn("WARN  task SETUP-0001: status 'tracking' not in vocabulary", out)
+        self.assertIn("WARN  task SETUP-0001: approval 'in-session' not in vocabulary", out)
+        self.assertIn("WARN  task SETUP-0001: Approval-packet unknown (write the packet or set none)", out)
+
+        path.write_text(tasks.replace("- Approval-packet: unknown", "- Approval-packet: approvals/SETUP-0001-2026-10-19.md"), encoding="utf-8")
+        self.assertIn("WARN  task SETUP-0001: approval packet not found: approvals/SETUP-0001-2026-10-19.md", self.validate())
+
+        path.write_text(tasks.replace("- Approval-packet: unknown\n", ""), encoding="utf-8")
+        self.assertIn("WARN  task SETUP-0001: no Approval-packet line", self.validate())
+
     def test_validator_rejects_beads_directory_in_a_markdown_workspace(self) -> None:
         (self.root / ".beads").mkdir()
         self.assertIn("ERROR workspace.yaml says tasks: markdown but .beads/ exists", self.validate())

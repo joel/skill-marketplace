@@ -46,6 +46,7 @@ Rules:
 - Complete a task with `Status: completed`, a new `Updated` date, `Evidence`, and move the entry to `## Completed`. When the file grows long, move completed entries older than the current month to `archive/tasks-YYYY-MM.md`.
 - Known issues are tasks of their own under `## Known issues`, so `memory-bank/progress.md` never lists them.
 - Recovery: the file is the record. There is nothing else to restore.
+- The validator warns, per task, when `Status` or `Approval` does not start with a vocabulary word, when the `Approval-packet` line is missing or says `unknown`, and when a packet it names does not exist.
 
 ## Beads (`tasks: beads`)
 
