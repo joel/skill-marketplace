@@ -16,7 +16,7 @@ description: >-
   own workflow doc. Do not engage for questions or read-only analysis; defer
   to a project-local skill with the same job when one exists.
 metadata:
-  version: "2.1.0"
+  version: "2.2.0"
   origin: "Genericised from a production Rails project's execution-plan skill"
 ---
 
@@ -130,27 +130,23 @@ and runs whose output is mostly noise; keep what the main agent must reason abou
 **Stays in the main agent:** implementing, commit messages, the PR body, review
 replies and triage. Briefs and what to ask back: [sub-agents.md](references/sub-agents.md).
 
+## Write for the reviewer
+
+AI-assisted PRs take longer to review when they over-comment or over-explain.
+Comments say what the code cannot (a constraint, a non-obvious *why*, an invariant),
+in one to three lines. Read the whole diff before pushing, as its first reviewer. The
+PR description stays under ~150 words of prose; review replies and the closing
+summary are a few lines each. Details and templates:
+[write-for-the-reviewer.md](references/write-for-the-reviewer.md).
+
 ## Workflow steps
 
 ### Step 1: Create the GitHub issue
 
-Before writing code, create an issue with a plan. For feature work, base the scope on
-the explorer findings and the chosen architect blueprint.
-
-```bash
-gh issue create --repo <owner>/<repo> --title "<descriptive title>" --label "<label>" \
-  --body "$(cat <<'EOT'
-## Summary
-<what and why>
-
-## Scope
-<bullet list of changes>
-
-## Verification
-<how to confirm it works>
-EOT
-)"
-```
+Before writing code, create an issue with a plan (`gh issue create`): the problem,
+the expected outcome, the scope and how to verify it. For feature work, base the scope
+on the explorer findings and the chosen architect blueprint. Body template in
+[write-for-the-reviewer.md](references/write-for-the-reviewer.md).
 
 Pick the label from the project's label set (typically `enhancement`, `bug`,
 `cleanup` or `refactor`, `documentation`). If the project keeps a per-effort audit
@@ -368,23 +364,11 @@ git push -u origin <branch-name>
 
 If the remote branch moved, reconcile onto its version; do not clobber it.
 
-```bash
-gh pr create --repo <owner>/<repo> --title "<PR title>" --body "$(cat <<'EOT'
-## Summary
-<bullet points of what changed>
-
-## Test plan
-- [x] Tests pass
-- [x] Lint and all gates pass
-- [x] Pre-commit hooks pass
-- [x] Live verification of <journey>
-
-Closes #<issue-number>
-EOT
-)"
-```
-
-Add the attribution footer your harness instructs.
+Before the first push, read the whole diff as its first reviewer. Then open the PR
+with `gh pr create`: what changed, why and what to look at, a short test plan, notes
+on migrations or manual steps, `Closes #<issue-number>`, under ~150 words of prose.
+Template in [write-for-the-reviewer.md](references/write-for-the-reviewer.md); add
+the attribution footer your harness instructs.
 
 ### Step 10: Move the issue to In Review
 
@@ -410,7 +394,8 @@ are explicitly deferred to tracked issues and their threads resolved.
 After the PR receives comments, human or bot, respond to every one and resolve each
 thread. Never leave a comment unanswered. For each comment decide one of:
 
-- **Actionable**: fix, commit, push, reply referencing the commit sha.
+- **Actionable**: fix, commit, push, reply naming the commit sha and the change in
+  one or two sentences.
 - **Incorrect**: reply with a clear technical explanation of why no change is
   needed.
 - **Deferred**: reply acknowledging the concern and naming the issue or PR that will
@@ -506,7 +491,7 @@ write it down now.
 7.  git commit (atomic; verify --stat)          → Hooks validate
 8.  run app + real browser (+ curl for cookies) → Live verification
 8b. docs + diagrams + design-system sync        → Code commit last
-9.  git fetch + push + gh pr create             → PR (Closes #N)
+9.  read the diff, git fetch, push, gh pr create → PR (Closes #N; under ~150 words)
 10. gh project item-edit                        → In Review
 10b. wait for + check the automated review      → Iterate until clean; bounded wait
 11. read + reply + resolve every thread         → Human and bot

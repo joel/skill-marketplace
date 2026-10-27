@@ -67,6 +67,15 @@ forbids an entry without a directory.
 
 ## Release notes
 
+### plan-implementation 2.2.0 (2026-10-27)
+
+Write for the reviewer. Code comments say what the code cannot, in one to
+three lines; the agent reads the whole diff as its first reviewer before
+pushing; the PR description stays under about 150 words of prose; review
+replies name the commit in a sentence or two. The issue body now states the
+problem and the expected outcome before the scope. The issue and PR templates
+moved to `references/write-for-the-reviewer.md`.
+
 ### plan-implementation 2.1.0 (2026-10-27)
 
 Sub-agents keep the main context for reasoning. An `Explore` agent writes a
