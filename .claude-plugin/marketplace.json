@@ -81,6 +81,22 @@
         "path": "plugins/helper-desk",
         "ref": "main"
       }
+    },
+    {
+      "name": "handoff",
+      "description": "At 250k tokens, offers Refresh: writes a handoff of the whole chat, shows the steps with progress bars, then copies it or starts a new chat with it. Logs every run to ~/.claude/handoffs/handoff.log and saves a draft first",
+      "author": {
+        "name": "Ben AI",
+        "url": "https://www.benai.co"
+      },
+      "category": "productivity",
+      "version": "0.2.0",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/joel/skill-marketplace.git",
+        "path": "plugins/handoff",
+        "ref": "main"
+      }
     }
   ]
 }

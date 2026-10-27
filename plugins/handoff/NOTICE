@@ -2,4 +2,20 @@ handoff
 
 Based on handoff 0.1.0, part of the "benai-mods" Claude Code mods collection by
 Ben AI (https://www.benai.co). Redistributed in joel/skill-marketplace with the
-author's permission. Changes from 0.1.0 are listed below as they are made.
+author's permission.
+
+Changes from 0.1.0 (in 0.2.0):
+- The ~/.claude/mods/switches.json switches and the .open-handoff request file
+  (from benai's `mods` pane) are gone. The mod is turned off with
+  `/plugin disable handoff`. Two userConfig fields, shown in /config, replace
+  them: offer auto|off and offer_at (tokens, default 250000).
+- Hide on the offer applies to the current chat only.
+- The home directory is read from HOME ($.env.get).
+- Copy uses Claude Code's clipboard ($.ui.copy) instead of pbcopy.
+- Start new chat: in Zellij it opens a pane beside the chat running claude
+  on the handoff; in a plain terminal it copies the handoff and shows the
+  command to run; the desktop app keeps its claude:// link. The Claude Pet
+  path is gone.
+- Open file uses `zellij edit --floating` inside Zellij.
+- Tests were updated to match the changes above.
+Everything else is the upstream code.
