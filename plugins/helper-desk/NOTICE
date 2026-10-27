@@ -13,4 +13,11 @@ Changes from 0.4.0 (in 0.5.0):
 - The home directory is read from HOME ($.env.get), not derived from the
   plugin's install path.
 - Tests were updated to match the changes above.
+
+Added in 0.6.0:
+- A Zellij floating window: `/helpers float`, and `pane: float` in /config.
+  The mod writes the desk as text (hooks/float.ts) and hooks/float.sh shows it
+  in a floating pane. The drawing helpers shared with the pane moved to
+  hooks/text.ts.
+
 Everything else is the upstream code.

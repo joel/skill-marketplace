@@ -68,6 +68,26 @@ forbids an entry without a directory.
 
 ## Release notes
 
+### helper-desk 0.6.0 (2026-10-27)
+
+A Zellij floating window for the desk. Inside Zellij, `/helpers float` opens
+the Helper Desk in a pinned floating pane that leaves the keyboard with
+Claude; running it again closes the pane, and so does `q` in the window.
+Set `pane` to `float` in `/config` to have it open by itself when subagents
+start (outside Zellij that setting falls back to the docked pane). The window
+shows the plan bar and one text card per subagent (step, tokens, time), with
+no pets or spinners. It is redrawn on every change and about once a second
+while helpers run.
+
+How it works: the mod writes each frame to
+`~/.claude/mods-state/helper-desk-<session>.txt` (written to a temp file and
+moved into place), and `hooks/float.sh`, a POSIX `sh` loop with no other
+dependency, redraws it in the pane. The pane id is kept in session state,
+so a plugin reload never opens a second window. The pane closes and its
+file is removed when the chat ends. After a crash, the window keeps its last
+frame until `q`. The pane opens 66 columns wide and is not reflowed when
+resized.
+
 ### helper-desk 0.5.0 (2026-10-27)
 
 First release here, based on Ben AI's helper-desk 0.4.0 (its `NOTICE` lists
