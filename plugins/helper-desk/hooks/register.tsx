@@ -2,6 +2,8 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { BandPlan, Helper, HelperPhase, PlanStatus, Step, StepKind } from '../types'
 import { connectorName, splitTool } from './connectors'
+import { ENDED, FLOAT_W, floatFrame, floatRunArgv } from './float'
+import { HUES, clockTime, cut, hueOf, tokenText } from './text'
 
 const NAME = 'helper-desk'
 const PANE = 'helpers'
@@ -14,6 +16,7 @@ const COST = { plugin: 'helper-desk', key: 'cost' } as const
 const HIDDEN = { plugin: 'helper-desk', key: 'hidden' } as const
 const PLAN = { plugin: 'helper-desk', key: 'plan' } as const
 const SHIM = { plugin: 'helper-desk', key: 'shimmer' } as const
+const FLOAT = { plugin: 'helper-desk', key: 'float' } as const
 
 const TICK_MS = 300
 const POLL_MS = 2000
@@ -55,18 +58,6 @@ const KIND_COLOR: Record<StepKind, string> = {
 
 type Px = [x: number, y: number]
 
-// Eight body colours that are easy to tell apart and read on light and dark.
-const HUES: { name: string; color: string }[] = [
-  { name: 'red', color: '#dc2626' },
-  { name: 'orange', color: '#ea580c' },
-  { name: 'yellow', color: '#eab308' },
-  { name: 'green', color: '#16a34a' },
-  { name: 'teal', color: '#0d9488' },
-  { name: 'blue', color: '#2563eb' },
-  { name: 'purple', color: '#9333ea' },
-  { name: 'pink', color: '#db2777' },
-]
-const hueOf = (hue: number) => HUES[((hue % HUES.length) + HUES.length) % HUES.length]!
 
 // Eyes and outline are the same on every pet.
 const EYE = '#2b1d16'
@@ -140,8 +131,9 @@ let tickN = 0
 let home = ''
 let sessionId = ''
 // The userConfig switches, set by register: /config changes them and reloads the module.
-// `pane`: auto opens by itself when helpers start, manual only on /helpers, off never draws.
-type PaneMode = 'auto' | 'manual' | 'off'
+// `pane`: auto opens by itself when helpers start, float does the same in a Zellij floating
+// pane (docked outside Zellij), manual only on /helpers, off never draws.
+type PaneMode = 'auto' | 'float' | 'manual' | 'off'
 let paneMode: PaneMode = 'auto'
 let bandOn = true
 const deskOn = () => paneMode !== 'off'
@@ -163,7 +155,6 @@ function toolWords(tool: string, connector: string) {
 }
 
 const base = (p: string) => p.split('/').filter(Boolean).pop() ?? p
-const cut = (t: string, n: number) => (n <= 0 ? '' : t.length > n ? `${t.slice(0, Math.max(0, n - 1))}…` : t)
 const oneLine = (t: string) => t.replace(/\s+/g, ' ').trim()
 
 function folder(p: string) {
@@ -244,20 +235,6 @@ function describe(tool: string, args: Record<string, unknown>): Step {
   }
 }
 
-function clockTime(ms: number) {
-  const t = Math.max(0, Math.floor(ms / 1000))
-  const h = Math.floor(t / 3600)
-  const m = Math.floor((t % 3600) / 60)
-  const sec = String(t % 60).padStart(2, '0')
-  return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`
-}
-
-function tokenText(n: number) {
-  if (n < 1000) return String(n)
-  if (n < 1_000_000) return `${Math.round(n / 1000)}k`
-  return `${(n / 1_000_000).toFixed(1)}M`
-}
-
 /** "claude-opus-5-5" reads "Opus 5.5"; "haiku" reads "Haiku". */
 function shortModel(model: string) {
   const hit = /(opus|sonnet|haiku|fable)(?:[-_ ](\d+))?(?:[-_.](\d+))?/i.exec(model)
@@ -304,6 +281,8 @@ async function log($: EngineInterface, line: string) {
 async function tick($: EngineInterface) {
   tickN += 1
   await $.state.set(CLOCK, { tick: tickN, now: await $.clock.now() })
+  // The float has no spinner: about once a second is enough for its clocks.
+  if (tickN % FLOAT_TICKS === 0) void writeFrame($)
 }
 
 async function readCost($: EngineInterface) {
@@ -360,6 +339,7 @@ async function publish($: EngineInterface) {
   await $.state.set(HELPERS, helpers.map(copy))
   await $.state.set(CLOCK, { tick: tickN, now: await $.clock.now() })
   await readCost($)
+  await writeFrame($)
   // No status line: on desktop it drew over Context Meter's footer bar. The pane shows the count.
   $.ui.status(undefined)
   syncTimers($)
@@ -397,7 +377,9 @@ async function addHelper($: EngineInterface, id: string, description: string, ty
   seats += 1
   await publish($)
   // The pane opens by itself when a new round of helpers starts.
-  if (wasIdle && paneMode === 'auto' && !hidden) void $.ui.open({ id: PANE, title: TITLE }).catch(err => log($, `open: ${String(err)}`))
+  if (!wasIdle || hidden) return
+  if (paneMode === 'float' && inZellij && interactive) void openFloat($).catch(err => log($, `float: ${String(err)}`))
+  else if (paneMode === 'auto' || paneMode === 'float') void $.ui.open({ id: PANE, title: TITLE }).catch(err => log($, `open: ${String(err)}`))
 }
 
 /** A loop whose spawn this mod missed (a reload, a race): take it from $.agent.list(). */
@@ -455,7 +437,9 @@ async function finish($: EngineInterface, id: string, phase: HelperPhase, usage:
 async function setHidden($: EngineInterface, value: boolean) {
   hidden = value
   await $.state.set(HIDDEN, hidden)
-  if (value) await $.ui.close({ id: PANE }).catch(() => undefined)
+  if (!value) return
+  await $.ui.close({ id: PANE }).catch(() => undefined)
+  await closeFloat($)
 }
 
 async function openPane($: EngineInterface) {
@@ -553,6 +537,7 @@ async function drawPlan($: EngineInterface) {
     : null
   await $.state.set(PLAN, value)
   syncShimmer($)
+  await writeFrame($)
 }
 
 /** The shimmer clock runs only while a shown plan has a step in progress. */
@@ -710,6 +695,136 @@ async function toggleIn($: EngineInterface, field: 'open' | 'folded', id: string
   const list = value[field]
   const nextList = list.includes(id) ? list.filter(x => x !== id) : [...list, id]
   await $.state.set(VIEW, { ...value, [field]: nextList })
+}
+
+// ---------- The Zellij float: the desk as text in a floating pane ----------
+
+// Clock ticks between frames written for the time alone.
+const FLOAT_TICKS = 3
+
+let inZellij = false
+// Only a chat someone watches opens a float by itself, not `claude -p` started from a Zellij pane.
+let interactive = false
+// The floating pane's id ("terminal_7") and the frame file it reads, also kept in $.state so a
+// reload neither loses nor doubles it. The file is fixed at open: a /clear changes the session id.
+let floatPane = ''
+let floatFile = ''
+let lastFrame = ''
+// One open and one frame write at a time: two helpers starting together must not open two
+// panes, and an older frame must never land after a newer one.
+let opening: Promise<string> | null = null
+let writing: Promise<void> | null = null
+let dirty = false
+
+const framePath = () => `${home}/.claude/mods-state/helper-desk-${sessionId}.txt`
+
+async function saveFrame($: EngineInterface, file: string, text: string) {
+  if (!stateDirMade) {
+    await $.process.run(['mkdir', '-p', `${home}/.claude/mods-state`])
+    stateDirMade = true
+  }
+  // Written beside it, then moved over it, so the viewer never reads half a frame.
+  const tmp = `${file}.tmp`
+  await $.fs.write(tmp, text)
+  await $.process.run(['mv', '-f', tmp, file])
+}
+
+/** The width the viewer reported for its pane, else the width it was opened with. */
+async function floatWidth($: EngineInterface, file: string) {
+  const cols = await $.fs
+    .read(`${file}.cols`)
+    .then(t => parseInt(String(t), 10))
+    .catch(() => NaN)
+  return Number.isFinite(cols) && cols > 0 ? cols : FLOAT_W - 2
+}
+
+async function writeOnce($: EngineInterface, file: string) {
+  const { value: cost = { usd: null } } = await $.state.get(COST)
+  const shown = bandOn && planShown && !!plan?.steps.length
+  const text = floatFrame({
+    helpers,
+    plan: plan ? { title: plan.title, steps: plan.steps.map(st => ({ text: st.text, status: st.status })), shown } : null,
+    now: await $.clock.now(),
+    costUsd: cost.usd,
+    width: await floatWidth($, file),
+  })
+  if (text === lastFrame) return
+  lastFrame = text
+  await saveFrame($, file, text)
+}
+
+/** The frame for the float, written only while it is open and only when it changed. */
+function writeFrame($: EngineInterface): Promise<void> {
+  if (!floatPane || !floatFile) return Promise.resolve()
+  // A change during a write is drawn from the state as it is once that write is done.
+  if (writing) {
+    dirty = true
+    return writing
+  }
+  writing = (async () => {
+    do {
+      dirty = false
+      await writeOnce($, floatFile).catch(err => log($, `frame: ${String(err)}`))
+    } while (dirty && floatPane)
+  })().finally(() => {
+    writing = null
+  })
+  return writing
+}
+
+/** False once Zellij no longer lists the pane (the viewer's q closes it); true when it cannot tell. */
+async function floatAlive($: EngineInterface, id: string) {
+  const r = await $.process.run(['zellij', 'action', 'list-panes']).catch(() => null)
+  if (!r || r.exitCode !== 0) return true
+  return new RegExp(`(^|\\s)${id}(\\s|$)`, 'm').test(r.stdout)
+}
+
+/** Opens the float, or says why not. */
+function openFloat($: EngineInterface): Promise<string> {
+  opening ??= doOpenFloat($).finally(() => {
+    opening = null
+  })
+  return opening
+}
+
+async function doOpenFloat($: EngineInterface): Promise<string> {
+  if (!inZellij) return `${TITLE} floats only inside Zellij. Type /helpers for the docked pane.`
+  if (!home || !sessionId) return `${TITLE} cannot float here: no home folder or session id.`
+  if (floatPane && (await floatAlive($, floatPane))) return `${TITLE} is already floating.`
+  const file = framePath()
+  lastFrame = ''
+  await writeOnce($, file)
+  const r = await $.process.run(floatRunArgv(`${$.plugin.root}/hooks/float.sh`, file, TITLE)).catch(err => {
+    void log($, `zellij run: ${String(err)}`)
+    return null
+  })
+  const id = r && r.exitCode === 0 ? (r.stdout.trim().split(/\s+/).pop() ?? '') : ''
+  if (!id) {
+    if (r) await log($, `zellij run: exit ${r.exitCode} ${r.stderr.trim()}`)
+    await $.process.run(['rm', '-f', file]).catch(() => undefined)
+    return `${TITLE} could not open a floating pane. See ~/.claude/mods-logs/${NAME}.log.`
+  }
+  floatPane = id
+  floatFile = file
+  await $.state.set(FLOAT, { paneId: id, file })
+  // Anything that changed while the pane opened.
+  await writeFrame($)
+  return `${TITLE} is floating. Type /helpers float again to close it.`
+}
+
+/** Tells the viewer to quit, closes the pane and removes the frame; quiet when it is already gone. */
+async function closeFloat($: EngineInterface) {
+  if (!floatPane) return
+  const id = floatPane
+  const file = floatFile
+  floatPane = ''
+  floatFile = ''
+  lastFrame = ''
+  await writing
+  await $.state.set(FLOAT, null)
+  await saveFrame($, file, `${ENDED}\n`).catch(() => undefined)
+  await $.process.run(['zellij', 'action', 'close-pane', '--pane-id', id]).catch(() => undefined)
+  await $.process.run(['rm', '-f', file, `${file}.cols`]).catch(() => undefined)
 }
 
 // ---------- Drawing ----------
@@ -880,7 +995,7 @@ ${body}
 }
 
 export const register: Register = (on, options) => {
-  paneMode = options.pane === 'manual' || options.pane === 'off' ? options.pane : 'auto'
+  paneMode = options.pane === 'float' || options.pane === 'manual' || options.pane === 'off' ? options.pane : 'auto'
   bandOn = options.band !== 'off'
 
   on('session.start', async ($, e, next) => {
@@ -920,6 +1035,14 @@ export const register: Register = (on, options) => {
     }).catch(err => log($, `register plan tool: ${String(err)}`))
     const { value: wasHidden = false } = await $.state.get(HIDDEN)
     hidden = wasHidden
+    inZellij = !!(await $.env.get('ZELLIJ').catch(() => undefined))
+    interactive = e.isInteractive
+    // A reload starts the module over: take the open float back from $.state.
+    const { value: floated = null } = await $.state.get(FLOAT)
+    if (!floatPane && floated) {
+      floatPane = floated.paneId
+      floatFile = floated.file
+    }
     await loadPlan($)
     // A reload keeps the drawn copy: carry on from it.
     if (!helpers.length) {
@@ -936,7 +1059,15 @@ export const register: Register = (on, options) => {
   })
 
   on('command.run', { command: 'helpers' }, async ($, e) => {
-    if (!deskOn()) return { text: `${TITLE}'s pane is off. Set pane to auto or manual for helper-desk in /config.` }
+    if (!deskOn()) return { text: `${TITLE}'s pane is off. Set pane to auto, float or manual for helper-desk in /config.` }
+    if (e.args.trim() === 'float') {
+      if (floatPane && (await floatAlive($, floatPane))) {
+        await closeFloat($)
+        return { text: `${TITLE} float closed.` }
+      }
+      if (hidden) await setHidden($, false)
+      return { text: await openFloat($) }
+    }
     if (e.args.trim() === 'hide') {
       await setHidden($, true)
       return { text: `${TITLE} hidden for this session. Type /helpers to show it.` }
@@ -1023,6 +1154,13 @@ export const register: Register = (on, options) => {
   })
 
   // A new prompt is a new task: the plan nudge counts from zero.
+  // The float goes with the chat; the viewer also quits by itself when its file goes.
+  // After /clear or a resume the process carries on, and so does the float.
+  on('session.end', async ($, e, next) => {
+    if (e.reason !== 'clear' && e.reason !== 'resume') await closeFloat($).catch(err => log($, `close float: ${String(err)}`))
+    return next(e)
+  })
+
   on('prompt.submit', async ($, e, next) => {
     turnCalls = 0
     turnPlanned = false

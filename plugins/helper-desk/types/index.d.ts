@@ -63,6 +63,8 @@ declare module 'claude-code' {
       cost: { usd: number | null }
       /** True once Hide or /helpers hide closed the pane for this session. */
       hidden: boolean
+      /** The Zellij floating pane showing the desk, null while none is open. */
+      float: { paneId: string; file: string } | null
       /** The plan the band draws; null before the first plan. */
       plan: BandPlan | null
       /** Shimmer tick for the step in progress; it counts only while one is in progress. */
