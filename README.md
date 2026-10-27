@@ -67,6 +67,17 @@ forbids an entry without a directory.
 
 ## Release notes
 
+### plan-implementation 2.6.0 (2026-10-27)
+
+Rebase hygiene. When the freshness check finds the branch behind `main`, the
+agent rebases (an already-pushed branch goes out with `--force-with-lease`,
+never `--force`; a branch others build on merges `main` instead), regenerates
+generated or binary files rather than hand-merging them, then checks what came
+in before validating again: reinstall dependencies and rebuild containers when
+a lockfile changed, run new migrations, move aside a local file that `main`
+now tracks. Symptoms of a stale branch, such as CI lint on files you did not
+touch, are listed too. Procedure in `references/freshness.md`.
+
 ### plan-implementation 2.5.0 (2026-10-27)
 
 One worktree per effort. Step 4 creates the branch in its own worktree
