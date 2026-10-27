@@ -20,7 +20,7 @@ and update at these points:
 | 11 (review round) | per-comment action, fix commit, and resolution, as a table |
 | 13 (release) | changelog entry filled, then release tag and URL |
 | 14 (done) | final summary table: issue → commit → release → status |
-| 15 (persist) | memories written or updated, docs touched, follow-up issues filed |
+| 15 (knowledge) | the Knowledge consolidation report, docs touched, follow-up issues filed |
 
 **Tone.** Factual and short. The audience is future-you or a reviewer reconstructing
 what decisions were made, not re-arguing them.
