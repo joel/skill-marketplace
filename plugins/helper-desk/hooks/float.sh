@@ -1,7 +1,8 @@
 #!/bin/sh
-# Helper Desk in a Zellij floating pane: redraws the frame file helper-desk writes; q quits.
+# Helper Desk in a floating pane of the terminal multiplexer: redraws the frame file
+# helper-desk writes; q quits. Plain sh, so it runs in any multiplexer's pane.
 # helper-desk replaces the file whole on each change. A first line of "#ended", or no file,
-# ends the viewer, and zellij closes the pane (it was opened with --close-on-exit).
+# ends the viewer, and the multiplexer closes the pane (it was opened to close on exit).
 # The pane's width goes to "<frame>.cols", so the next frame is drawn to fit it.
 frame=$1
 saved=$(stty -g 2>/dev/null)

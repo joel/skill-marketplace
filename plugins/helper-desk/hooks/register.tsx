@@ -2,7 +2,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { BandPlan, Helper, HelperPhase, PlanStatus, Step, StepKind } from '../types'
 import { connectorName, splitTool } from './connectors'
-import { ENDED, FLOAT_COLS, FLOAT_REFIT_MS, floatFrame, floatRunArgv } from './float'
+import { ENDED, FLOAT_COLS, FLOAT_REFIT_MS, type FloatPane, floatFrame, floatSpec } from './float'
 import { HUES, clockTime, cut, hueOf, tokenText } from './text'
 
 const NAME = 'helper-desk'
@@ -131,8 +131,8 @@ let tickN = 0
 let home = ''
 let sessionId = ''
 // The userConfig switches, set by register: /config changes them and reloads the module.
-// `pane`: auto opens by itself when helpers start, float does the same in a Zellij floating
-// pane (docked outside Zellij), manual only on /helpers, off never draws.
+// `pane`: auto opens by itself when helpers start, float does the same in a floating pane of the
+// terminal multiplexer (docked without one), manual only on /helpers, off never draws.
 type PaneMode = 'auto' | 'float' | 'manual' | 'off'
 let paneMode: PaneMode = 'auto'
 let bandOn = true
@@ -378,7 +378,7 @@ async function addHelper($: EngineInterface, id: string, description: string, ty
   await publish($)
   // The pane opens by itself when a new round of helpers starts.
   if (!wasIdle || hidden) return
-  if (paneMode === 'float' && inZellij && interactive) void openFloat($).catch(err => log($, `float: ${String(err)}`))
+  if (paneMode === 'float' && canFloat && interactive) void openFloat($).catch(err => log($, `float: ${String(err)}`))
   else if (paneMode === 'auto' || paneMode === 'float') void $.ui.open({ id: PANE, title: TITLE }).catch(err => log($, `open: ${String(err)}`))
 }
 
@@ -697,17 +697,18 @@ async function toggleIn($: EngineInterface, field: 'open' | 'folded', id: string
   await $.state.set(VIEW, { ...value, [field]: nextList })
 }
 
-// ---------- The Zellij float: the desk as text in a floating pane ----------
+// ---------- The float: the desk as text in a floating pane of the terminal multiplexer ----------
 
 // Clock ticks between frames written for the time alone.
 const FLOAT_TICKS = 3
 
-let inZellij = false
-// Only a chat someone watches opens a float by itself, not `claude -p` started from a Zellij pane.
+// True when the chat runs in a multiplexer whose backend opens floating panes ($.mux.info()).
+let canFloat = false
+// Only a chat someone watches opens a float by itself, not `claude -p` started in a multiplexer.
 let interactive = false
-// The floating pane's id ("terminal_7") and the frame file it reads, also kept in $.state so a
-// reload neither loses nor doubles it. The file is fixed at open: a /clear changes the session id.
-let floatPane = ''
+// The floating pane and the frame file it reads, also kept in $.state so a reload neither loses
+// nor doubles it. The file is fixed at open: a /clear changes the session id.
+let floatPane: FloatPane | null = null
 let floatFile = ''
 let lastFrame = ''
 // One open and one frame write at a time: two helpers starting together must not open two
@@ -772,11 +773,18 @@ function writeFrame($: EngineInterface): Promise<void> {
   return writing
 }
 
-/** False once Zellij no longer lists the pane (the viewer's q closes it); true when it cannot tell. */
-async function floatAlive($: EngineInterface, id: string) {
-  const r = await $.process.run(['zellij', 'action', 'list-panes']).catch(() => null)
-  if (!r || r.exitCode !== 0) return true
-  return new RegExp(`(^|\\s)${id}(\\s|$)`, 'm').test(r.stdout)
+/** False once the multiplexer says the pane is gone (the viewer's q closes it); true when it cannot tell, so floats never stack. */
+async function floatAlive($: EngineInterface, pane: FloatPane) {
+  return (await $.mux.isOpen({ pane }).catch(() => null)) !== false
+}
+
+/** Whether this chat's multiplexer opens floating panes; false with none, or a backend that cannot. */
+async function muxFloats($: EngineInterface) {
+  try {
+    return !!(await $.mux.info())?.floating
+  } catch {
+    return false
+  }
 }
 
 /** Opens the float, or says why not. */
@@ -788,25 +796,28 @@ function openFloat($: EngineInterface): Promise<string> {
 }
 
 async function doOpenFloat($: EngineInterface): Promise<string> {
-  if (!inZellij) return `${TITLE} floats only inside Zellij. Type /helpers for the docked pane.`
+  // No multiplexer, or one that cannot float: the docked pane, the same desk.
+  if (!canFloat) {
+    await openPane($)
+    return `No terminal multiplexer that opens floating panes here, so ${TITLE} opens docked.`
+  }
   if (!home || !sessionId) return `${TITLE} cannot float here: no home folder or session id.`
   if (floatPane && (await floatAlive($, floatPane))) return `${TITLE} is already floating.`
   const file = framePath()
   lastFrame = ''
   await writeOnce($, file)
-  const r = await $.process.run(floatRunArgv(`${$.plugin.root}/hooks/float.sh`, file, TITLE)).catch(err => {
-    void log($, `zellij run: ${String(err)}`)
+  const pane = await $.mux.openFloating(floatSpec(`${$.plugin.root}/hooks/float.sh`, file, TITLE)).catch(err => {
+    void log($, `open float: ${String(err)}`)
     return null
   })
-  const id = r && r.exitCode === 0 ? (r.stdout.trim().split(/\s+/).pop() ?? '') : ''
-  if (!id) {
-    if (r) await log($, `zellij run: exit ${r.exitCode} ${r.stderr.trim()}`)
+  if (!pane) {
+    await log($, 'open float: the multiplexer opened no pane')
     await $.process.run(['rm', '-f', file]).catch(() => undefined)
     return `${TITLE} could not open a floating pane. See ~/.claude/mods-logs/${NAME}.log.`
   }
-  floatPane = id
+  floatPane = pane
   floatFile = file
-  await $.state.set(FLOAT, { paneId: id, file })
+  await $.state.set(FLOAT, { pane, file })
   // Anything that changed while the pane opened.
   await writeFrame($)
   // The first frame guessed the width: draw it again once the viewer has reported its pane's.
@@ -819,15 +830,15 @@ async function doOpenFloat($: EngineInterface): Promise<string> {
 /** Tells the viewer to quit, closes the pane and removes the frame; quiet when it is already gone. */
 async function closeFloat($: EngineInterface) {
   if (!floatPane) return
-  const id = floatPane
+  const pane = floatPane
   const file = floatFile
-  floatPane = ''
+  floatPane = null
   floatFile = ''
   lastFrame = ''
   await writing
   await $.state.set(FLOAT, null)
   await saveFrame($, file, `${ENDED}\n`).catch(() => undefined)
-  await $.process.run(['zellij', 'action', 'close-pane', '--pane-id', id]).catch(() => undefined)
+  await $.mux.close({ pane }).catch(() => undefined)
   await $.process.run(['rm', '-f', file, `${file}.cols`]).catch(() => undefined)
 }
 
@@ -1039,12 +1050,13 @@ export const register: Register = (on, options) => {
     }).catch(err => log($, `register plan tool: ${String(err)}`))
     const { value: wasHidden = false } = await $.state.get(HIDDEN)
     hidden = wasHidden
-    inZellij = !!(await $.env.get('ZELLIJ').catch(() => undefined))
+    canFloat = await muxFloats($)
     interactive = e.isInteractive
     // A reload starts the module over: take the open float back from $.state.
     const { value: floated = null } = await $.state.get(FLOAT)
     if (!floatPane && floated) {
-      floatPane = floated.paneId
+      // 0.6 kept a Zellij pane id alone; 0.7 keeps the multiplexer's pane.
+      floatPane = floated.pane ?? (floated.paneId ? { mux: 'zellij', id: floated.paneId } : null)
       floatFile = floated.file
     }
     await loadPlan($)

@@ -1,4 +1,4 @@
-// Small drawing helpers shared by the pane, the band and the Zellij float.
+// Small drawing helpers shared by the pane, the band and the floating window.
 
 // Eight body colours that are easy to tell apart and read on light and dark.
 export const HUES: { name: string; color: string }[] = [

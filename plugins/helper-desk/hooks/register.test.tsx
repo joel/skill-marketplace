@@ -5,6 +5,24 @@ import { floatFrame } from './float'
 /** The `on` a test body is handed. */
 type On = Parameters<NonNullable<Parameters<typeof test>[2]>>[1]
 
+// helper-desk depends on the multiplexer plugin's $.mux. Each test loads this stand-in beside it:
+// every $.mux call becomes `fake-mux <call> <json>` on $.process.run, which the rig answers and
+// records, so a test sees the calls without a real multiplexer.
+const fakeMux = {
+  name: 'multiplexer',
+  register(on: On) {
+    on('engine.create', async ($, e, next) => ({
+      ...(await next(e)),
+      mux: { info: async () => null, openFloating: async () => null, openBeside: async () => null, edit: async () => null, isOpen: async () => null, close: async () => undefined },
+    }))
+    const ask = async (out: { stdout: string }) => ({ value: JSON.parse(out.stdout || 'null') })
+    on('mux.info', async $ => ask(await $.process.run(['fake-mux', 'info', '{}'])))
+    on('mux.openFloating', async ($, e) => ask(await $.process.run(['fake-mux', 'openFloating', JSON.stringify(e)])))
+    on('mux.isOpen', async ($, e) => ask(await $.process.run(['fake-mux', 'isOpen', JSON.stringify(e)])))
+    on('mux.close', async ($, e) => ask(await $.process.run(['fake-mux', 'close', JSON.stringify(e)])))
+  },
+}
+
 type Agent = { id: string; description: string; type: string; status: string }
 
 /** The file `path` names: exact, or a key led by a star that any home can end with. */
@@ -14,8 +32,12 @@ const keyOf = (files: Record<string, string>, path: string) =>
 /** Each tool spec the mod registered, newest test only. */
 let specs: { isDeferred?: boolean }[] = []
 
-/** Mocks every $ call the mod makes; `files` stands in for the disk, `env` adds variables beside HOME. */
-function rig(on: On, files: Record<string, string>, env: Record<string, string> = {}) {
+/**
+ * Mocks every $ call the mod makes; `files` stands in for the disk, `env` adds variables beside
+ * HOME. ZELLIJ in `env` makes the stand-in multiplexer one that floats; `cannotTell` makes it
+ * answer null to whether a pane is open.
+ */
+function rig(on: On, files: Record<string, string>, env: Record<string, string> = {}, cannotTell = false) {
   const ids = ['agent-a1', 'agent-a2', 'agent-a3']
   const agents: Agent[] = []
   const statuses: (string | undefined)[] = []
@@ -30,7 +52,7 @@ function rig(on: On, files: Record<string, string>, env: Record<string, string> 
     const { name } = e as { name: string }
     return { value: name === 'HOME' ? '/Users/test' : env[name] } as never
   })
-  // Zellij's panes, by id; `zellij run` adds terminal_7, terminal_8, ...
+  // The multiplexer's panes, by id; each float adds terminal_7, terminal_8, ...
   const panes = new Set<string>()
   let nextPane = 7
   on('session.usage', async () => ({ value: { startedAt: 0, context: {}, rateLimits: [], cost: { usd: 0.42 } } }) as never)
@@ -91,13 +113,19 @@ function rig(on: On, files: Record<string, string>, env: Record<string, string> 
       delete files[from]
     }
     let stdout = ''
-    if (argv[0] === 'zellij' && argv[1] === 'run') {
-      const id = `terminal_${nextPane++}`
-      panes.add(id)
-      stdout = `${id}\n`
+    if (argv[0] === 'fake-mux') {
+      const arg = JSON.parse(argv[2] ?? '{}') as { pane?: { id: string } }
+      let value: unknown = null
+      if (argv[1] === 'info') value = env.ZELLIJ ? { name: 'zellij', floating: true, beside: true, edit: true } : null
+      if (argv[1] === 'openFloating' && env.ZELLIJ) {
+        const id = `terminal_${nextPane++}`
+        panes.add(id)
+        value = { mux: 'zellij', id }
+      }
+      if (argv[1] === 'isOpen') value = cannotTell ? null : panes.has(arg.pane?.id ?? '')
+      if (argv[1] === 'close') panes.delete(arg.pane?.id ?? '')
+      stdout = JSON.stringify(value)
     }
-    if (argv[0] === 'zellij' && argv[2] === 'list-panes') stdout = ['PANE_ID  TYPE  TITLE', ...[...panes].map(id => `${id}  terminal  x`)].join('\n')
-    if (argv[0] === 'zellij' && argv[2] === 'close-pane') panes.delete(argv[argv.length - 1]!)
     return { value: { exitCode: 0, stdout, stderr: '' } } as never
   })
   return { agents, statuses, opened, closed, ran, clock, toasts, panes }
@@ -127,7 +155,7 @@ const props = (bodyColumns = 60) =>
   ({ title: 'Helpers', isFocused: false, bodyColumns, placement: 'dock', scroll: {}, view: {} }) as never
 
 for (const surface of ['desktop', 'terminal'] as const) {
-  test(`two helpers get live cards, then both are done (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+  test(`two helpers get live cards, then both are done (${surface})`, { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
     const { agents, statuses, opened, clock } = rig(on, {})
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
     // A plain signature: the connector-typed one is too deep for tsc.
@@ -176,7 +204,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(statuses[statuses.length - 1], 'status cleared').toBeUndefined()
   })
 
-  test(`two helpers get two body colours, and only running pets move (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+  test(`two helpers get two body colours, and only running pets move (${surface})`, { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
     const { clock } = rig(on, {})
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
     await $.agent.spawn({ tool_use_id: 's1', prompt: 'x', description: 'Build the landing page', subagentType: 'general-purpose' } as never)
@@ -225,7 +253,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await still(), 'still after another tick').toBe(first)
   })
 
-  test(`a new helper never takes a running helper's colour (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+  test(`a new helper never takes a running helper's colour (${surface})`, { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
     const { clock, agents } = rig(on, {})
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
     await $.agent.spawn({ tool_use_id: 's1', prompt: 'x', description: 'One', subagentType: 'general-purpose' } as never)
@@ -250,7 +278,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     if (surface === 'desktop') expect(all, 'third is yellow').toContain('yellow')
   })
 
-  test(`connector steps are named from the server or the tool names, never a raw id (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+  test(`connector steps are named from the server or the tool names, never a raw id (${surface})`, { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
     const { clock } = rig(on, {})
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
     const callTool = $.tool.call as unknown as (input: unknown) => Promise<unknown>
@@ -288,7 +316,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await v.find({ text: /00000000/ }), 'no raw server id').toBeUndefined()
   })
 
-  test(`pressing a card's toggle shows its full step list (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+  test(`pressing a card's toggle shows its full step list (${surface})`, { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
     const { clock } = rig(on, {})
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
     const callTool = $.tool.call as unknown as (input: unknown) => Promise<unknown>
@@ -327,7 +355,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await v.find({ text: /^File read$/ }), 'closed again').toBeUndefined()
   })
 
-  test(`pane: off: no cards, no auto open, and /helpers says how to turn it on (${surface})`, { timeoutMs: 30000, options: { pane: 'off' } }, async ($, on) => {
+  test(`pane: off: no cards, no auto open, and /helpers says how to turn it on (${surface})`, { plugins: [fakeMux], timeoutMs: 30000, options: { pane: 'off' } }, async ($, on) => {
     const { opened, clock } = rig(on, {})
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
     await $.agent.spawn({ tool_use_id: 's1', prompt: 'x', description: 'Build the landing page', subagentType: 'general-purpose' } as never)
@@ -341,7 +369,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(opened, '/helpers opens nothing').not.toContain('helpers')
   })
 
-  test(`pane: manual: helpers are tracked but the pane opens only on /helpers (${surface})`, { timeoutMs: 30000, options: { pane: 'manual' } }, async ($, on) => {
+  test(`pane: manual: helpers are tracked but the pane opens only on /helpers (${surface})`, { plugins: [fakeMux], timeoutMs: 30000, options: { pane: 'manual' } }, async ($, on) => {
     const { opened, clock } = rig(on, {})
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
     await $.agent.spawn({ tool_use_id: 's1', prompt: 'x', description: 'Build the landing page', subagentType: 'general-purpose' } as never)
@@ -353,7 +381,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await v.find({ text: /Build the landing page/ }), 'the card draws').toBeDefined()
   })
 
-  test(`each card has one thick sparkle bar (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+  test(`each card has one thick sparkle bar (${surface})`, { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
     const { clock } = rig(on, {})
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
     await $.agent.spawn({ tool_use_id: 's1', prompt: 'x', description: 'Build the landing page', subagentType: 'general-purpose' } as never)
@@ -370,7 +398,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     }
   })
 
-  test(`Hide closes the pane for this session, writes no file, and /helpers shows it again (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+  test(`Hide closes the pane for this session, writes no file, and /helpers shows it again (${surface})`, { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
     const files: Record<string, string> = {}
     const { opened, closed, clock } = rig(on, files)
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
@@ -394,7 +422,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(opened.length, '/helpers opens it').toBe(before + 1)
   })
 
-  test(`/helpers hide closes the pane and stops it opening by itself (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+  test(`/helpers hide closes the pane and stops it opening by itself (${surface})`, { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
     const { opened, closed, clock } = rig(on, {})
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
     const r = await $.command.run({ command: 'helpers', args: 'hide' } as never)
@@ -405,7 +433,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(opened, 'no auto open while hidden').not.toContain('helpers')
   })
 
-  test(`the plan tool writes the plan file and draws "2 of 4" (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+  test(`the plan tool writes the plan file and draws "2 of 4" (${surface})`, { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
     const files: Record<string, string> = {}
     const { clock, ran } = rig(on, files)
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
@@ -457,7 +485,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await bandSays(v, surface), 'back on the next update').toContain('Tasks 3/4')
   })
 
-  test(`a TodoWrite call on the main chat is mirrored into the plan (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+  test(`a TodoWrite call on the main chat is mirrored into the plan (${surface})`, { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
     const files: Record<string, string> = {}
     const { clock } = rig(on, files)
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
@@ -481,7 +509,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await v.find({ type: 'Text', text: /^Now: Write the summary$/ }), 'current todo').toBeDefined()
   })
 
-  test(`a step finishing raises a toast, and a finished plan holds 20 s then hides (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+  test(`a step finishing raises a toast, and a finished plan holds 20 s then hides (${surface})`, { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
     const { clock, toasts } = rig(on, {})
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
     const callTool = $.tool.call as unknown as (input: unknown) => Promise<unknown>
@@ -509,7 +537,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await bandSays(v, surface), 'new plan shows').toContain('Tasks 0/4')
   })
 
-  test(`band: off: the band draws nothing of its own, and the plan still saves (${surface})`, { timeoutMs: 30000, options: { band: 'off' } }, async ($, on) => {
+  test(`band: off: the band draws nothing of its own, and the plan still saves (${surface})`, { plugins: [fakeMux], timeoutMs: 30000, options: { band: 'off' } }, async ($, on) => {
     const files: Record<string, string> = {}
     const { clock, toasts } = rig(on, files)
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
@@ -526,7 +554,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
   })
 }
 
-test('the plan tool sits in front, and work without a plan gets one nudge', { timeoutMs: 30000 }, async ($, on) => {
+test('the plan tool sits in front, and work without a plan gets one nudge', { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
   specs = []
   const files: Record<string, string> = {}
   const { clock } = rig(on, files)
@@ -546,25 +574,27 @@ test('the plan tool sits in front, and work without a plan gets one nudge', { ti
   expect(planFile(files), 'plan file written for Chat Inventory').toBeDefined()
 })
 
-// ---------- The Zellij float ----------
+// ---------- The float, through the multiplexer ----------
 
 const ZELLIJ = { ZELLIJ: '0' }
 const FRAME = '/Users/test/.claude/mods-state/helper-desk-sess1.txt'
-const zellijRuns = (ran: string[][]) => ran.filter(a => a[0] === 'zellij' && a[1] === 'run')
+const floats = (ran: string[][]) => ran.filter(a => a[0] === 'fake-mux' && a[1] === 'openFloating')
+const closes = (ran: string[][]) => ran.filter(a => a[0] === 'fake-mux' && a[1] === 'close')
 const spawn = ($: Parameters<NonNullable<Parameters<typeof test>[2]>>[0], description: string, id: string) =>
   $.agent.spawn({ tool_use_id: id, prompt: 'x', description, subagentType: 'general-purpose' } as never)
 const visible = (line: string) => line.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')
 
-test('/helpers float outside Zellij says so and runs no zellij', { timeoutMs: 30000 }, async ($, on) => {
-  const { ran, clock } = rig(on, {})
+test('with no multiplexer, /helpers float docks the pane and says why', { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
+  const { ran, opened, clock } = rig(on, {})
   await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface: 'terminal', isInteractive: true } as never)
   await clock.settle()
   const r = await $.command.run({ command: 'helpers', args: 'float' } as never)
-  expect(String((r as { text?: string }).text), 'names Zellij').toContain('only inside Zellij')
-  expect(ran.filter(a => a[0] === 'zellij'), 'no zellij call').toEqual([])
+  expect(String((r as { text?: string }).text), 'says why').toContain('No terminal multiplexer that opens floating panes here')
+  expect(opened, 'the docked pane').toContain('helpers')
+  expect(floats(ran), 'no float asked for').toEqual([])
 })
 
-test('/helpers float in Zellij opens one pinned float without focus, writes the frame, and toggles closed', { timeoutMs: 30000 }, async ($, on) => {
+test('/helpers float in a multiplexer opens one pinned float without focus, writes the frame, and toggles closed', { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
   const files: Record<string, string> = {}
   const { ran, clock, panes } = rig(on, files, ZELLIJ)
   await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface: 'terminal', isInteractive: true } as never)
@@ -572,16 +602,15 @@ test('/helpers float in Zellij opens one pinned float without focus, writes the 
   await clock.settle()
   const r = await $.command.run({ command: 'helpers', args: 'float' } as never)
   expect(String((r as { text?: string }).text), 'says floating').toContain('floating')
-  const runs = zellijRuns(ran)
-  expect(runs, 'one zellij run').toHaveLength(1)
-  const argv = runs[0]!
-  for (const flag of ['--floating', '--no-focus', '--close-on-exit', '--pinned']) expect(argv, flag).toContain(flag)
-  // The bottom right corner, as shares of the screen.
-  const at = (flag: string) => argv[argv.indexOf(flag) + 1]
-  expect([at('--x'), at('--y'), at('--width'), at('--height')], 'bottom right').toEqual(['55%', '45%', '45%', '55%'])
-  expect(argv.slice(-3)[0], 'runs sh').toBe('sh')
-  expect(argv[argv.length - 2]!.endsWith('/hooks/float.sh'), 'the viewer script').toBe(true)
-  expect(argv[argv.length - 1], 'the frame file under HOME').toBe(FRAME)
+  const runs = floats(ran)
+  expect(runs, 'one float').toHaveLength(1)
+  // What it asks the multiplexer for, not how: a pinned corner pane that leaves the keyboard.
+  const spec = JSON.parse(runs[0]![2]!) as { name: string; argv: string[]; anchor: string; width: string; height: string; pinned: boolean; takeFocus: boolean; closeOnExit: boolean }
+  expect([spec.anchor, spec.width, spec.height], 'bottom right').toEqual(['bottom-right', '45%', '55%'])
+  expect([spec.pinned, spec.takeFocus, spec.closeOnExit], 'pinned, no focus, closes with the viewer').toEqual([true, false, true])
+  expect(spec.argv[0], 'runs sh').toBe('sh')
+  expect(spec.argv[1]!.endsWith('/hooks/float.sh'), 'the viewer script').toBe(true)
+  expect(spec.argv[2], 'the frame file under HOME').toBe(FRAME)
   expect(files[FRAME] ?? '', 'frame drawn').toContain('Build the landing page')
   expect(Object.keys(files).some(k => k.endsWith('.tmp')), 'no half-written file left').toBe(false)
 
@@ -591,47 +620,47 @@ test('/helpers float in Zellij opens one pinned float without focus, writes the 
   expect(files[FRAME] ?? '', 'step drawn').toContain('Reading brief.md')
 
   await $.command.run({ command: 'helpers', args: 'float' } as never)
-  expect(ran.some(a => a[2] === 'close-pane' && a.includes('terminal_7')), 'close-pane by id').toBe(true)
+  expect(closes(ran).some(a => a[2]!.includes('terminal_7')), 'closed by its pane').toBe(true)
   expect(FRAME in files, 'frame file removed').toBe(false)
   expect(panes.size, 'no pane left').toBe(0)
 })
 
-test('a float closed with q is opened again, never doubled while it lives', { timeoutMs: 30000 }, async ($, on) => {
+test('a float closed with q is opened again, never doubled while it lives', { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
   const { ran, clock, panes } = rig(on, {}, ZELLIJ)
   await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface: 'terminal', isInteractive: true } as never)
   await clock.settle()
   await $.command.run({ command: 'helpers', args: 'float' } as never)
-  // q in the viewer: zellij closes the pane on its own.
+  // q in the viewer: the multiplexer closes the pane on its own.
   panes.clear()
   const r = await $.command.run({ command: 'helpers', args: 'float' } as never)
   expect(String((r as { text?: string }).text), 'opened again').toContain('floating')
-  expect(zellijRuns(ran), 'two runs in all').toHaveLength(2)
+  expect(floats(ran), 'two runs in all').toHaveLength(2)
 })
 
-test('pane: float opens the float by itself in Zellij when helpers start', { timeoutMs: 30000, options: { pane: 'float' } }, async ($, on) => {
+test('pane: float opens the float by itself in a multiplexer when helpers start', { plugins: [fakeMux], timeoutMs: 30000, options: { pane: 'float' } }, async ($, on) => {
   const files: Record<string, string> = {}
   const { ran, opened, clock } = rig(on, files, ZELLIJ)
   await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface: 'terminal', isInteractive: true } as never)
   await spawn($, 'Build the landing page', 's1')
   await clock.settle()
-  expect(zellijRuns(ran), 'one float').toHaveLength(1)
+  expect(floats(ran), 'one float').toHaveLength(1)
   expect(opened, 'no docked pane').not.toContain('helpers')
   await spawn($, 'Write the copy', 's2')
   await clock.settle()
-  expect(zellijRuns(ran), 'still one float').toHaveLength(1)
+  expect(floats(ran), 'still one float').toHaveLength(1)
   expect(files[FRAME] ?? '', 'both cards').toContain('Write the copy')
 })
 
-test('pane: float outside Zellij falls back to the docked pane', { timeoutMs: 30000, options: { pane: 'float' } }, async ($, on) => {
+test('pane: float with no multiplexer falls back to the docked pane', { plugins: [fakeMux], timeoutMs: 30000, options: { pane: 'float' } }, async ($, on) => {
   const { ran, opened, clock } = rig(on, {})
   await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface: 'terminal', isInteractive: true } as never)
   await spawn($, 'Build the landing page', 's1')
   await clock.settle()
   expect(opened, 'docked pane').toContain('helpers')
-  expect(zellijRuns(ran), 'no float').toEqual([])
+  expect(floats(ran), 'no float').toEqual([])
 })
 
-test('the end of the chat closes the float', { timeoutMs: 30000 }, async ($, on) => {
+test('the end of the chat closes the float', { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
   const files: Record<string, string> = {}
   const { ran, clock } = rig(on, files, ZELLIJ)
   on('session.end', async () => ({ sessionId: 'sess1' }) as never)
@@ -639,7 +668,7 @@ test('the end of the chat closes the float', { timeoutMs: 30000 }, async ($, on)
   await clock.settle()
   await $.command.run({ command: 'helpers', args: 'float' } as never)
   await $.session.end({ reason: 'exit' } as never)
-  expect(ran.some(a => a[2] === 'close-pane'), 'closed').toBe(true)
+  expect(closes(ran), 'closed').toHaveLength(1)
   expect(FRAME in files, 'frame file removed').toBe(false)
 })
 
@@ -663,27 +692,27 @@ test('a frame fits its width, shows the plan and every group', () => {
     expect(all, want).toContain(want)
 })
 
-test('pane: float with two helpers starting together opens one float', { timeoutMs: 30000, options: { pane: 'float' } }, async ($, on) => {
+test('pane: float with two helpers starting together opens one float', { plugins: [fakeMux], timeoutMs: 30000, options: { pane: 'float' } }, async ($, on) => {
   const files: Record<string, string> = {}
   const { ran, clock } = rig(on, files, ZELLIJ)
   await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface: 'terminal', isInteractive: true } as never)
   await Promise.all([spawn($, 'Build the landing page', 's1'), spawn($, 'Write the copy', 's2')])
   await clock.settle()
-  expect(zellijRuns(ran), 'one float').toHaveLength(1)
+  expect(floats(ran), 'one float').toHaveLength(1)
   const frame = files[FRAME] ?? ''
   expect(frame, 'first card').toContain('Build the landing page')
   expect(frame, 'second card').toContain('Write the copy')
 })
 
-test('pane: float in a chat nobody watches (claude -p) opens no float', { timeoutMs: 30000, options: { pane: 'float' } }, async ($, on) => {
+test('pane: float in a chat nobody watches (claude -p) opens no float', { plugins: [fakeMux], timeoutMs: 30000, options: { pane: 'float' } }, async ($, on) => {
   const { ran, clock } = rig(on, {}, ZELLIJ)
   await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface: 'terminal', isInteractive: false } as never)
   await spawn($, 'Build the landing page', 's1')
   await clock.settle()
-  expect(zellijRuns(ran), 'no float').toEqual([])
+  expect(floats(ran), 'no float').toEqual([])
 })
 
-test('/clear keeps the float, and its frame file', { timeoutMs: 30000 }, async ($, on) => {
+test('/clear keeps the float, and its frame file', { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
   const files: Record<string, string> = {}
   const { ran, clock } = rig(on, files, ZELLIJ)
   on('session.end', async () => ({ sessionId: 'sess1' }) as never)
@@ -691,13 +720,13 @@ test('/clear keeps the float, and its frame file', { timeoutMs: 30000 }, async (
   await clock.settle()
   await $.command.run({ command: 'helpers', args: 'float' } as never)
   await $.session.end({ reason: 'clear' } as never)
-  expect(ran.some(a => a[2] === 'close-pane'), 'not closed').toBe(false)
+  expect(closes(ran), 'not closed').toEqual([])
   await spawn($, 'Build the landing page', 's1')
   await clock.settle()
   expect(files[FRAME] ?? '', 'still drawn to the same file').toContain('Build the landing page')
 })
 
-test('the float draws to the width its viewer reports', { timeoutMs: 30000 }, async ($, on) => {
+test('the float draws to the width its viewer reports', { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
   const files: Record<string, string> = {}
   const { clock } = rig(on, files, ZELLIJ)
   await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface: 'terminal', isInteractive: true } as never)
@@ -705,7 +734,7 @@ test('the float draws to the width its viewer reports', { timeoutMs: 30000 }, as
   await $.command.run({ command: 'helpers', args: 'float' } as never)
   const widest = () => Math.max(...(files[FRAME] ?? '').split('\n').map(l => visible(l).length))
   expect(widest() <= 40, 'before the viewer says, a width that fits a narrow pane').toBe(true)
-  // Zellij gave the pane 30 columns; float.sh says so, and the frame refits with no other change.
+  // The multiplexer gave the pane 30 columns; float.sh says so, and the frame refits with no other change.
   files[`${FRAME}.cols`] = '30\n'
   await clock.advance(2_000)
   expect(widest() <= 30, 'refitted after opening').toBe(true)
@@ -717,4 +746,15 @@ test('the float draws to the width its viewer reports', { timeoutMs: 30000 }, as
   expect(widest() <= 70, 'fits the pane').toBe(true)
   await $.command.run({ command: 'helpers', args: 'float' } as never)
   expect(`${FRAME}.cols` in files, 'width file removed with the pane').toBe(false)
+})
+
+test('a multiplexer that cannot tell whether the float is open never gets a second one', { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
+  const { ran, clock } = rig(on, {}, ZELLIJ, true)
+  await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface: 'terminal', isInteractive: true } as never)
+  await clock.settle()
+  await $.command.run({ command: 'helpers', args: 'float' } as never)
+  // Unknown counts as open: the second /helpers float closes it rather than stacking another.
+  const r = await $.command.run({ command: 'helpers', args: 'float' } as never)
+  expect(String((r as { text?: string }).text), 'closed').toContain('float closed')
+  expect(floats(ran), 'one float in all').toHaveLength(1)
 })
