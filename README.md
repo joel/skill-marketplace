@@ -14,6 +14,7 @@ Marketplace name: `joel-skills`. Catalog: `.claude-plugin/marketplace.json`.
 | `prompt-debias` | Rewrites a draft prompt before you send it so the answering model cannot silently inherit your frames. Models refute what you assert but inherit what you assume. The skill inventories every injected frame, keeps real constraints and evidence, quarantines the rest as hypotheses to test, states the question neutrally, and adds instructions that force competing framings and odds-backed conclusions. Returns the rewritten prompt plus a table of what changed. Inspired by [Techintrospect's AI Bullshit Fixer](https://techintrospect.substack.com/p/ai-bullshit-fixer-prompt). |
 | `joel-tone` | Rewrites drafts, emails, Slack messages, proposals, or LLM-generated copy into Joel's voice so they read like a careful human wrote them. Picks the register first (public Vogon Partners copy or Joel's own messages), then applies the hard rules: no em or en dashes, no invented facts, no empty intensifiers, no filled-template rhythm. Ships the public-website voice brief as a reference. Returns paste-ready text plus a short note on what changed and what to check. |
 | `helper-desk` | A Claude Code mod (a hooks module, not a skill) by [Ben AI](https://www.benai.co), redistributed with permission. A purple task bar above the prompt fills as Claude ticks off its plan, and the Helper Desk pane shows one live card per subagent: its current step, tokens, time and a progress bar. Registers a `plan` tool and `/helpers`, and adds a short system-prompt section plus plan nudges to every session while it is enabled. Built and tested on Claude Code 2.1.311 (upstream 0.4.0 needed 2.1.287 or newer). See [helper-desk 0.5.0](#helper-desk-050-2026-10-27). |
+| `handoff` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. When a chat reaches 250k tokens (configurable), a Refresh row offers to move the work to a fresh chat. It writes a handoff of the whole chat (what was asked, decided and done, files to open, next steps) with one model call, saves a draft first, and keeps every handoff in `~/.claude/handoffs/`. Then it copies the handoff, or starts the new chat: in a Zellij pane beside this one, or in the desktop app. `/refresh` shows the row, `/handoff` writes one now. Pairs with cache-clock's "Hand off" button. See [handoff 0.2.0](#handoff-020-2026-10-27). |
 
 ## Installation (one-time, per machine)
 
@@ -67,6 +68,29 @@ allowed), and it is the only PR that bumps the version. A rename cannot land on
 forbids an entry without a directory.
 
 ## Release notes
+
+### handoff 0.2.0 (2026-10-27)
+
+First release here, based on Ben AI's handoff 0.1.0 (its `NOTICE` lists what
+changed). The handoff itself is written by one model call (`$.model.fork`)
+over the chat, so it costs about one reply on a big context.
+
+- **Switches are Claude Code's own.** Turn it off with `/plugin disable
+  handoff`. In `/config`, `offer` (`auto`/`off`) sets whether the Refresh row
+  offers itself, and `offer_at` sets the token count where it does (250000 by
+  default). Hide on the row applies to the current chat only; `/refresh`
+  brings it back.
+- **Terminal and Zellij.**
+  - **Copy** uses Claude Code's own clipboard, so it works in a terminal too
+    (OSC 52, Zellij included), not only on a Mac.
+  - **Start new chat**, inside Zellij, opens a pane beside the chat running
+    `claude` on the handoff. In a plain terminal it copies the handoff and
+    shows the `claude "$(cat …)"` command to run. The desktop app still fills
+    a new chat.
+  - **Open file** opens the handoff in your `$EDITOR` in a floating Zellij
+    pane.
+- **Home from `HOME`**, so logs and handoffs land in `~/.claude/handoffs/`
+  under `--plugin-dir` too.
 
 ### helper-desk 0.6.0 (2026-10-27)
 
