@@ -18,4 +18,9 @@ Changes from 0.1.0 (in 0.2.0):
   path is gone.
 - Open file uses `zellij edit --floating` inside Zellij.
 - Tests were updated to match the changes above.
+In 0.3.0:
+- Start new chat and Open file go through the multiplexer plugin's $.mux (a
+  dependency) instead of running zellij itself; with no multiplexer, Open
+  file uses open on a Mac and xdg-open elsewhere.
+
 Everything else is the upstream code.

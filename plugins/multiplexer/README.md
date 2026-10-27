@@ -2,7 +2,7 @@
 
 One interface for terminal multiplexers, for Claude Code mods. A mod calls `$.mux` and says what it wants, like "a floating pane in the bottom right corner that leaves the keyboard with the chat". The multiplexer the chat runs in does it. **Zellij** is supported today. Others plug in as a backend (see below).
 
-Mods that use it list it under `dependencies`, and Claude Code installs it with them. A mod whose dependency is missing doesn't load; Claude Code names the missing plugin and the command to install it.
+Install it with `claude plugin install multiplexer@joel-skills`, after `claude plugin marketplace add joel/skill-marketplace`. Mods that use it list it under `dependencies`, and Claude Code installs it with them. A mod whose dependency is missing doesn't load; Claude Code names the missing plugin and the command to install it.
 
 ## The interface
 

@@ -17,6 +17,20 @@ Marketplace name: `joel-skills`. Catalog: `.claude-plugin/marketplace.json`.
 | `handoff` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. When a chat reaches 250k tokens (configurable), a Refresh row offers to move the work to a fresh chat. It writes a handoff of the whole chat (what was asked, decided and done, files to open, next steps) with one model call, saves a draft first, and keeps every handoff in `~/.claude/handoffs/`. Then it copies the handoff, or starts the new chat: in a Zellij pane beside this one, or in the desktop app. `/refresh` shows the row, `/handoff` writes one now. Pairs with cache-clock's "Hand off" button. See [handoff 0.2.0](#handoff-020-2026-10-27). |
 | `cache-clock` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. Counts down above the prompt until the chat's prompt cache goes cold (5 min or 1 hour, read from the chat's transcript), so you know when a reply is still cheap. Keep warm (`/keepwarm`) sends a tiny background ping before the cache expires. When a big chat goes cold, "Hand off to a fresh chat" runs the handoff mod, so install both. Fits narrow terminals and Zellij panes. See [cache-clock 0.4.0](#cache-clock-040-2026-10-27). |
 | `effort-optimizer` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. Before Claude starts on a prompt, one short model call reads it and picks the effort level it needs (low to max) with Ben's four-question framework. In `suggest` mode a question offers the switch; in `auto` mode it switches by itself. The level goes on this chat's requests only, never into your own effort setting, and the footer shows it (`Effort Low`). Settings in `/config`; `/effort-optimizer` shows the real level. See [effort-optimizer 0.2.0](#effort-optimizer-020-2026-10-27). |
+| `multiplexer` | Not a mod you see: a plugin that gives mods one interface to terminal multiplexers (`$.mux`). helper-desk and handoff use it for floating windows, panes beside the chat and a floating editor, and Claude Code installs it with them. Zellij is supported. With no multiplexer, each call has a defined "none" answer and each mod falls back (see [Terminal multiplexers](#terminal-multiplexers)). tmux and others can be added as a backend. See [multiplexer 0.1.0](#multiplexer-010-2026-10-27). |
+
+## Terminal multiplexers
+
+helper-desk and handoff use the `multiplexer` plugin's `$.mux` interface. They never call a multiplexer directly.
+
+| Mod | In Zellij | With no multiplexer |
+|-----|-----------|---------------------|
+| helper-desk `/helpers float`, `pane: float` | a pinned window in the bottom right corner | the docked pane, and a line saying why |
+| handoff Start new chat | a pane beside the chat running `claude` on the handoff | the handoff copied, plus the command to run |
+| handoff Open file | your `$EDITOR` in a floating pane | `open` on a Mac, `xdg-open` elsewhere |
+
+- **tmux:** a chat inside tmux behaves as having no multiplexer until someone writes a tmux backend. `plugins/multiplexer/README.md` says how, with a sketch.
+- **The dependency is required.** A mod that depends on `multiplexer` doesn't load without it, and Claude Code names the missing plugin. If an update leaves helper-desk or handoff unloaded, run `claude plugin install multiplexer@joel-skills`.
 
 ## Installation (one-time, per machine)
 
@@ -70,6 +84,25 @@ allowed), and it is the only PR that bumps the version. A rename cannot land on
 forbids an entry without a directory.
 
 ## Release notes
+
+### multiplexer 0.1.0 (2026-10-27)
+
+A new plugin: one `$.mux` interface for terminal multiplexers, so mods ask for what they want and never call a multiplexer directly. Examples: "a pinned floating pane in the bottom right corner that leaves the keyboard with the chat", or "a pane beside the chat".
+
+- **Calls:** `info`, `openFloating`, `openBeside`, `edit`, `isOpen` and `close`. The contract is `plugins/multiplexer/types/index.d.ts`.
+- **No multiplexer is the default.** Every call then answers `null` (`close` answers nothing), and each mod falls back where it gets `null`.
+- **Zellij** is the one backend, using the same commands helper-desk and handoff used before. A bottom-right float is placed from its size.
+- **tmux** is detected but has no backend, so it counts as none. The debug log says so once. The plugin's README explains how to add a backend.
+
+### helper-desk 0.7.0 (2026-10-27)
+
+The floating window goes through `$.mux`, and helper-desk now depends on `multiplexer`.
+- With no multiplexer, `/helpers float` opens the docked pane and says why. Before, it refused.
+- A float opened by 0.6 is still recognised after the update.
+
+### handoff 0.3.0 (2026-10-27)
+
+Start new chat and Open file go through `$.mux`, and handoff now depends on `multiplexer`. With no multiplexer, Open file uses `xdg-open` outside a Mac, not only `open`.
 
 ### effort-optimizer 0.2.0 (2026-10-27)
 
