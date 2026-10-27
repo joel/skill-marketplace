@@ -16,7 +16,7 @@ description: >-
   own workflow doc. Do not engage for questions or read-only analysis; defer
   to a project-local skill with the same job when one exists.
 metadata:
-  version: "2.3.0"
+  version: "2.4.0"
   origin: "Genericised from a production Rails project's execution-plan skill"
 ---
 
@@ -430,7 +430,14 @@ The objective gate is:
 - `mergeStateStatus: CLEAN` and `MERGEABLE`,
 - zero unresolved review threads (every thread fixed or accepted-and-resolved),
 - the latest automated-reviewer verdict is clean, or the remainder is accepted nits
-  you consciously resolved.
+  you consciously resolved,
+- the **QA notes** are written where the project config says (default: a `## QA`
+  section in the PR body), unless it sets them to `none`.
+
+Write the QA notes last, from what shipped, for a tester who knows the product but not
+the code: a two-minute **Quick check** (the change works, the neighbouring journey
+still does), then a **Full check** with data that makes a regression visible. Template
+in [qa-instructions.md](references/qa-instructions.md).
 
 **Who merges is a project setting.** If the project config grants merge authority to
 the agent, merge once the gate is green and do not pause for approval:
@@ -440,7 +447,7 @@ gh pr merge <PR> --repo <owner>/<repo> --squash
 ```
 
 If the project config says humans merge, or says nothing, **stop at PR-ready**:
-report the gate status and hand off. Docs-only PRs that sit blocked with no failing
+post the closing summary (Step 14) and hand off. Docs-only PRs that sit blocked with no failing
 checks follow the project's docs-PR convention (often an admin merge).
 
 ### Step 13: Tag and publish a release (optional, after merge)
@@ -454,9 +461,8 @@ newest heading should be the previous tag; backfill from release notes if not.
 
 ```bash
 git checkout main && git pull origin main
-# Confirm the merge commit's own main CI/deploy run is green. Get the sha from
-# `gh pr view <PR> --json mergeCommit`; the PR's status rollup describes the PR-head
-# checks, not the push-to-main run of the squash commit.
+# First confirm the merge commit's own main CI run is green (sha from
+# `gh pr view <PR> --json mergeCommit`), not the PR-head checks.
 gh release view <tag> --repo <owner>/<repo> >/dev/null 2>&1 \
   && echo "<tag> already released, skip" \
   || gh release create <tag> --repo <owner>/<repo> --target main --title "<title>" --generate-notes
@@ -464,8 +470,10 @@ gh release view <tag> --repo <owner>/<repo> >/dev/null 2>&1 \
 
 ### Step 14: Move the issue to Done
 
-Board update with the Done option ID. Write the final summary (issue → commit →
-release → status) to the audit log if used.
+Board update with the Done option ID. Post the **closing summary**, a few lines each:
+what shipped, what was accepted or deferred and why, what verification ran, the
+Knowledge consolidation report (Step 15), and the follow-up issues filed. Copy it to
+the audit log if used.
 
 ### Step 15: Knowledge consolidation report (mandatory)
 
@@ -504,8 +512,8 @@ repository; Pass 2 only reported.
 10. gh project item-edit                        → In Review
 10b. wait for + check the automated review      → Iterate until clean; bounded wait
 11. read + reply + resolve every thread         → Human and bot; then Pass 2 (report only)
-12. merge per project policy                    → Agent merges only if the project grants it
+12. QA notes, then merge per project policy     → Agent merges only if the project grants it
 13. changelog first, then gh release create     → Optional
-14. gh project item-edit + final summary        → Done
+14. gh project item-edit + closing summary      → Done
 15. knowledge report + follow-up issues         → The repository remembers, never agent memory
 ```
