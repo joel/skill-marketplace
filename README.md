@@ -10,7 +10,7 @@ Marketplace name: `joel-skills`. Catalog: `.claude-plugin/marketplace.json`.
 | Plugin | What it does |
 |--------|--------------|
 | `vendor-neutral-workspace` | Initialise, adopt, maintain, audit, or hand over a vendor-neutral workspace. The repository's files, not any provider's chat history or hidden memory, are the durable record of an AI agent's work, so the same subject resumes from another machine or another harness (Claude Code, Codex, Cursor, OpenCode). One agent by default, `AGENTS.md` carrying the boot sequence; context in the six Memory Bank files; decisions as MADR 4.0 records in `docs/decisions/`; tasks in a Markdown file or in Beads, declared in `workspace.yaml`; session records, summaries and approval packets beside them. Ships the standard, the template, scripts to create, validate and migrate (v1 → v2) a workspace, and Claude Code hooks that block ending a session without its record. |
-| `execution-plan` | Drives any piece of code work through a full lifecycle: size-scaled design pass, GitHub issue, Kanban, branch, implement, seed data, internal code and security review loops, validation gates, atomic commits, live verification in a real browser, docs and diagrams, PR, automated-reviewer loop, review-thread triage, merge per project policy, optional release, and persisting what was learned. Generic: each project supplies its own repo, board, commands, gates, reviewer bot, and merge policy through its workflow doc. |
+| `plan-implementation` | Drives any piece of code work through a full lifecycle: size-scaled design pass, GitHub issue, Kanban, branch, implement, seed data, internal code and security review loops, validation gates, atomic commits, live verification in a real browser, docs and diagrams, PR, automated-reviewer loop, review-thread triage, merge per project policy, optional release, and persisting what was learned. Generic: each project supplies its own repo, board, commands, gates, reviewer bot, and merge policy through its workflow doc. |
 | `prompt-debias` | Rewrites a draft prompt before you send it so the answering model cannot silently inherit your frames. Models refute what you assert but inherit what you assume. The skill inventories every injected frame, keeps real constraints and evidence, quarantines the rest as hypotheses to test, states the question neutrally, and adds instructions that force competing framings and odds-backed conclusions. Returns the rewritten prompt plus a table of what changed. Inspired by [Techintrospect's AI Bullshit Fixer](https://techintrospect.substack.com/p/ai-bullshit-fixer-prompt). |
 | `joel-tone` | Rewrites drafts, emails, Slack messages, proposals, or LLM-generated copy into Joel's voice so they read like a careful human wrote them. Picks the register first (public Vogon Partners copy or Joel's own messages), then applies the hard rules: no em or en dashes, no invented facts, no empty intensifiers, no filled-template rhythm. Ships the public-website voice brief as a reference. Returns paste-ready text plus a short note on what changed and what to check. |
 
@@ -66,6 +66,22 @@ allowed), and it is the only PR that bumps the version. A rename cannot land on
 forbids an entry without a directory.
 
 ## Release notes
+
+### plan-implementation 2.0.0 (2026-10-27)
+
+The plugin and skill `execution-plan` 1.x are renamed `plan-implementation`,
+so they no longer clash with the `execution-plan` skill in
+[alliantist/claude-skills](https://github.com/alliantist/claude-skills) when
+both marketplaces are installed. The behaviour is unchanged. The run banner
+now reads **USING PLAN IMPLEMENTATION**. The `## Execution plan configuration`
+block that projects paste into their workflow doc keeps its heading, so
+existing project configuration still applies.
+
+```
+claude plugin uninstall execution-plan@joel-skills
+claude plugin marketplace update joel-skills
+claude plugin install plan-implementation@joel-skills
+```
 
 ### vendor-neutral-workspace 2.0.0 (2026-10-18)
 
