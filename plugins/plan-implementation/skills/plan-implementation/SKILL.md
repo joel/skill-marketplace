@@ -1,5 +1,5 @@
 ---
-name: execution-plan
+name: plan-implementation
 description: >-
   Drive the end-to-end execution of any coherent piece of code work in a
   GitHub-hosted project: a size-scaled design pass (feature-dev agents,
@@ -14,13 +14,13 @@ description: >-
   "execute the plan". No step silently drops. Project-specific values (repo,
   board, commands, gates, reviewer bot, merge policy) come from the project's
   own workflow doc. Do not engage for questions or read-only analysis; defer
-  to a project-local execution-plan skill when one exists.
+  to a project-local skill with the same job when one exists.
 metadata:
-  version: "1.0.0"
+  version: "2.0.0"
   origin: "Genericised from a production Rails project's execution-plan skill"
 ---
 
-# Execution Plan
+# Plan Implementation
 
 This skill enforces a full development lifecycle for every coherent piece of code
 work:
@@ -32,7 +32,7 @@ Done → Persist.
 **Announce the skill at the start of every run** with a visible marker line so the
 developer can see the lifecycle is engaged:
 
-> **USING EXECUTION PLAN** — #123 · bug fix · issue → branch → implement → CR →
+> **USING PLAN IMPLEMENTATION** — #123 · bug fix · issue → branch → implement → CR →
 > commit → verify → PR → review loop → merge → done
 
 ## Why this matters
@@ -46,8 +46,9 @@ Live verification regularly catches runtime errors that unit and system tests mi
 
 - Engage in any git repository with a GitHub remote when the request will produce
   commits. Stay silent for questions, explanations, and read-only analysis.
-- **If the repository ships its own execution-plan skill** (for example
-  `.claude/skills/execution-plan/`), that project-local version wins. Do not run both.
+- **If the repository ships its own skill with the same job** (for example
+  `.claude/skills/execution-plan/` or `.claude/skills/plan-implementation/`), that
+  project-local version wins. Do not run both.
 - **The project's workflow doc overrides this skill.** Read `AGENTS.md` and
   `CLAUDE.md` first. They supply the values this skill deliberately leaves open. See
   [project configuration](references/project-config.md) for the contract and a
