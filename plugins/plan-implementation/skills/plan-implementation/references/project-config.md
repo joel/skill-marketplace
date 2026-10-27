@@ -29,6 +29,7 @@ template below in the first run and fill it from what you discover; mark unknown
 | Docs to keep in sync | Step 8b | architecture doc, setup recipe, design-system doc, diagrams directory |
 | CI path-ignore rules | Steps 8b, 10b | `**/*.md`, `doc/**`, `.claude/**` |
 | Automated reviewer bot | Step 10b | login name, trigger comment, clean-verdict text |
+| QA notes | Step 12 | `PR body` (default), `issue comment`, a tracker field, or `none` |
 | Merge policy | Step 12 | `agent` or `human` |
 | Release policy | Step 13 | tag format, changelog file, who cuts releases |
 | Audit log | Steps 1–15 | path pattern for the per-effort log, or none |
@@ -57,6 +58,7 @@ template below in the first run and fill it from what you discover; mark unknown
 - Docs to sync: <architecture doc>, <setup recipe>, <design-system doc>, <diagrams>
 - CI path-ignores: <globs>
 - Automated reviewer: <bot login>; trigger `<comment>`; clean verdict text "<...>"
+- QA notes: <PR body | issue comment | tracker field name | none>
 - Merge policy: <agent | human>
 - Releases: <none | tag format, changelog path, policy>
 - Audit log: <none | path pattern>

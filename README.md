@@ -67,6 +67,18 @@ forbids an entry without a directory.
 
 ## Release notes
 
+### plan-implementation 2.4.0 (2026-10-27)
+
+QA notes and a closing summary. Before merging or handing off, the agent
+writes QA notes for a tester who knows the product but not the code: a
+two-minute Quick check, then a Full check with data that makes a regression
+visible, using the screen's own labels. They go in a `## QA` section of the
+PR body by default; the new `QA notes` project-config key can send them to an
+issue comment or a tracker field, or turn them off. The closing summary
+(what shipped, what was accepted and why, verification, the knowledge report,
+follow-up issues) is posted at PR-ready or after merge. Template in
+`references/qa-instructions.md`.
+
 ### plan-implementation 2.3.0 (2026-10-27)
 
 Knowledge consolidation, in the repository only. A candidate log starts at
