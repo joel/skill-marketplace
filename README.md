@@ -67,6 +67,18 @@ forbids an entry without a directory.
 
 ## Release notes
 
+### plan-implementation 2.3.0 (2026-10-27)
+
+Knowledge consolidation, in the repository only. A candidate log starts at
+Step 1; before the first push (Pass 1), candidates that pass five gates
+(novel, verified, reusable, scoped, durable) go to their narrowest home in the
+repository as a docs commit; after the review loop (Pass 2), new learnings
+are reported and filed as follow-up issues, never committed to the PR. Step 15
+no longer writes agent memory: it closes with a Knowledge consolidation
+report. New project-config key for knowledge homes (index, inbox, business
+rules, decision records, design patterns). Manual acceptance scenarios in
+`skills/plan-implementation/tests/scenarios.md`.
+
 ### plan-implementation 2.2.0 (2026-10-27)
 
 Write for the reviewer. Code comments say what the code cannot, in one to

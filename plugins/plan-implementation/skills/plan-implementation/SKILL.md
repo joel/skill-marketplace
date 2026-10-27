@@ -16,7 +16,7 @@ description: >-
   own workflow doc. Do not engage for questions or read-only analysis; defer
   to a project-local skill with the same job when one exists.
 metadata:
-  version: "2.2.0"
+  version: "2.3.0"
   origin: "Genericised from a production Rails project's execution-plan skill"
 ---
 
@@ -151,6 +151,10 @@ on the explorer findings and the chosen architect blueprint. Body template in
 Pick the label from the project's label set (typically `enhancement`, `bug`,
 `cleanup` or `refactor`, `documentation`). If the project keeps a per-effort audit
 log, open it now. See [audit-log.md](references/audit-log.md).
+
+Start the **knowledge candidate log** now: a scratch file outside the checkout, one
+line per surprise (rule, why, evidence, status). Passes 1 and 2 consume it; see
+[knowledge-consolidation.md](references/knowledge-consolidation.md).
 
 ### Step 2: Add to the Kanban board
 
@@ -362,7 +366,10 @@ git fetch origin && git log --oneline HEAD..origin/main | head   # anything new 
 git push -u origin <branch-name>
 ```
 
-If the remote branch moved, reconcile onto its version; do not clobber it.
+If the remote branch moved, reconcile onto its version; do not clobber it. After the
+freshness check and before this run's first push, run **consolidation Pass 1**:
+confirmed candidates that pass the five gates go into their own docs commit, pushed
+with the code and named in the PR body (never as a docs-only PR tip, Step 8b).
 
 Before the first push, read the whole diff as its first reviewer. Then open the PR
 with `gh pr create`: what changed, why and what to look at, a short test plan, notes
@@ -412,6 +419,9 @@ API recipes for reading, replying, and resolving threads (including the reply
 endpoint that returns 404 without the PR number) are in
 [pr-review-threads.md](references/pr-review-threads.md).
 
+When the review loop is done, run **consolidation Pass 2** over what CI and the
+reviews taught. It reports, it never commits to this PR (Step 15).
+
 ### Step 12: Merge, per project policy
 
 The objective gate is:
@@ -457,28 +467,27 @@ gh release view <tag> --repo <owner>/<repo> >/dev/null 2>&1 \
 Board update with the Done option ID. Write the final summary (issue → commit →
 release → status) to the audit log if used.
 
-### Step 15: Persist what is worth keeping
+### Step 15: Knowledge consolidation report (mandatory)
 
-Finishing a feature is the moment to save what would otherwise evaporate at the
-next context reset:
+Every effort makes the next one easier, and **the repository remembers, never agent
+memory**: do not write the harness's memory or any personal store, which teammates,
+other machines and other agents cannot see. Pass 1 committed what passed the five
+gates (novel, verified, reusable, scoped, durable) to its narrowest home in the
+repository; Pass 2 only reported.
 
-- **Agent memory**: a gotcha that cost real time, a decision and its rationale, a
-  consciously accepted limitation, a recurring failure mode. Write the non-obvious
-  part, not what code or git already records. Update rather than duplicate.
-- **Project documentation**: architecture and flow changes with diagrams, the setup
-  recipe when a step changed, the design system when tokens or components changed,
-  the changelog entry.
-- **Follow-ups**: anything deferred or discovered out of scope becomes a tracked
-  issue, not a PR comment or a memory.
-
-Rule of thumb: if a future you or a teammate would have to re-derive it from scratch,
-write it down now.
+- The closing summary carries a **Knowledge consolidation** section: captured, Pass 2
+  not committed, already documented, unresolved, skill proposals, or "No reusable
+  knowledge identified".
+- **Follow-ups**: Pass 2 learnings and anything deferred or out of scope become
+  tracked issues, not a PR comment or a memory.
+- Project documentation (architecture, setup recipe, design system, changelog) is
+  Step 8b's and Step 13's; confirm it landed.
 
 ## Quick reference: complete flow
 
 ```
 0.  explorer + architect agents (×2-3)          → Design pass (feature/multi-file; skip if trivial)
-1.  gh issue create (+ open audit log)          → Issue with plan grounded in the design pass
+1.  gh issue create (+ audit, candidate log)   → Issue with plan grounded in the design pass
 2.  gh project item-add                         → Add to board (Backlog)
 3.  gh project item-edit                        → In Progress
 4.  git checkout -b feature/                    → Branch
@@ -491,12 +500,12 @@ write it down now.
 7.  git commit (atomic; verify --stat)          → Hooks validate
 8.  run app + real browser (+ curl for cookies) → Live verification
 8b. docs + diagrams + design-system sync        → Code commit last
-9.  read the diff, git fetch, push, gh pr create → PR (Closes #N; under ~150 words)
+9.  read the diff, git fetch, push, gh pr create → Pass 1 docs commit; PR (Closes #N; under ~150 words)
 10. gh project item-edit                        → In Review
 10b. wait for + check the automated review      → Iterate until clean; bounded wait
-11. read + reply + resolve every thread         → Human and bot
+11. read + reply + resolve every thread         → Human and bot; then Pass 2 (report only)
 12. merge per project policy                    → Agent merges only if the project grants it
 13. changelog first, then gh release create     → Optional
 14. gh project item-edit + final summary        → Done
-15. memory + project docs + follow-up issues    → Persist before the context resets
+15. knowledge report + follow-up issues         → The repository remembers, never agent memory
 ```

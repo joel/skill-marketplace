@@ -32,6 +32,7 @@ template below in the first run and fill it from what you discover; mark unknown
 | Merge policy | Step 12 | `agent` or `human` |
 | Release policy | Step 13 | tag format, changelog file, who cuts releases |
 | Audit log | Steps 1–15 | path pattern for the per-effort log, or none |
+| Knowledge homes | Steps 9, 15 | knowledge index, inbox directory for fragments, business-rules doc, decision records (`docs/decisions/`), design-patterns doc; any may be none |
 
 ## Template block for a project's AGENTS.md
 
@@ -59,6 +60,7 @@ template below in the first run and fill it from what you discover; mark unknown
 - Merge policy: <agent | human>
 - Releases: <none | tag format, changelog path, policy>
 - Audit log: <none | path pattern>
+- Knowledge: index <path | none>; inbox <dir | none>; business rules <path | none>; decisions <dir | none>; design patterns <path | none>
 ```
 
 ## Precedence
