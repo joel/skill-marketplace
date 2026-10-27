@@ -67,6 +67,16 @@ forbids an entry without a directory.
 
 ## Release notes
 
+### plan-implementation 2.1.0 (2026-10-27)
+
+Sub-agents keep the main context for reasoning. An `Explore` agent writes a
+one-page orientation brief before implementing and again after every
+compaction, a `general-purpose` agent runs validation and reports failures
+only (per commit for a stack), and a blocking local tooling gap is fixed by an
+agent in its own worktree. Implementation, commit messages, the PR body and
+review triage stay in the main agent. Briefs in `references/sub-agents.md`.
+The announce marker says when the run reuses an approved plan-mode plan.
+
 ### plan-implementation 2.0.0 (2026-10-27)
 
 The plugin and skill `execution-plan` 1.x are renamed `plan-implementation`,
