@@ -576,6 +576,9 @@ test('/helpers float in Zellij opens one pinned float without focus, writes the 
   expect(runs, 'one zellij run').toHaveLength(1)
   const argv = runs[0]!
   for (const flag of ['--floating', '--no-focus', '--close-on-exit', '--pinned']) expect(argv, flag).toContain(flag)
+  // The bottom right corner, as shares of the screen.
+  const at = (flag: string) => argv[argv.indexOf(flag) + 1]
+  expect([at('--x'), at('--y'), at('--width'), at('--height')], 'bottom right').toEqual(['55%', '45%', '45%', '55%'])
   expect(argv.slice(-3)[0], 'runs sh').toBe('sh')
   expect(argv[argv.length - 2]!.endsWith('/hooks/float.sh'), 'the viewer script').toBe(true)
   expect(argv[argv.length - 1], 'the frame file under HOME').toBe(FRAME)
@@ -701,12 +704,17 @@ test('the float draws to the width its viewer reports', { timeoutMs: 30000 }, as
   await clock.settle()
   await $.command.run({ command: 'helpers', args: 'float' } as never)
   const widest = () => Math.max(...(files[FRAME] ?? '').split('\n').map(l => visible(l).length))
-  expect(widest() > 40, 'opened at its full width').toBe(true)
-  // Zellij gave the pane 40 columns; float.sh says so.
-  files[`${FRAME}.cols`] = '40\n'
-  await spawn($, 'A description long enough to need cutting when the pane is narrow', 's1')
+  expect(widest() <= 40, 'before the viewer says, a width that fits a narrow pane').toBe(true)
+  // Zellij gave the pane 30 columns; float.sh says so, and the frame refits with no other change.
+  files[`${FRAME}.cols`] = '30\n'
+  await clock.advance(2_000)
+  expect(widest() <= 30, 'refitted after opening').toBe(true)
+  // A wide pane gets a wide frame.
+  files[`${FRAME}.cols`] = '70\n'
+  await spawn($, 'A description long enough to use the room of a wide pane, and more', 's1')
   await clock.settle()
-  expect(widest() <= 40, 'fits the pane').toBe(true)
+  expect(widest() > 40, 'uses the room').toBe(true)
+  expect(widest() <= 70, 'fits the pane').toBe(true)
   await $.command.run({ command: 'helpers', args: 'float' } as never)
   expect(`${FRAME}.cols` in files, 'width file removed with the pane').toBe(false)
 })
