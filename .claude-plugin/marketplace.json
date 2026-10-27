@@ -65,6 +65,22 @@
         "path": "plugins/joel-tone",
         "ref": "main"
       }
+    },
+    {
+      "name": "helper-desk",
+      "description": "Helper Desk: a purple task progress bar above the prompt that moves as each to-do item is done, and a side pane with one live card per subagent",
+      "author": {
+        "name": "Ben AI",
+        "url": "https://www.benai.co"
+      },
+      "category": "productivity",
+      "version": "0.5.0",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/joel/skill-marketplace.git",
+        "path": "plugins/helper-desk",
+        "ref": "main"
+      }
     }
   ]
 }
