@@ -35,7 +35,10 @@ const LABELS = [
 // Module variables reset on a reload; the band itself lives in $.state.
 let sid = ''
 let home = ''
-let inZellij = false
+// The terminal multiplexer's name and what it does ($.mux.info()); null with none.
+let mux: { name: string; beside: boolean; edit: boolean } | null = null
+// The OS command that opens a file in its app: open on a Mac, xdg-open elsewhere; found once.
+let opener = ''
 let busy = false
 // The model asked for a refresh in the middle of its turn: it starts when the turn ends,
 // because a fork while a tool call is open would send a tool use with no result.
@@ -411,8 +414,9 @@ async function copy($: EngineInterface, surface: RenderSurface) {
 // The fresh chat's first prompt: a lead line, so the text never starts with "#".
 const firstPrompt = () => `Continue from this handoff of an earlier chat:\n\n${handoffText}`
 
-// The desktop app fills a new chat from its own link. In Zellij a pane beside this one runs
-// a fresh `claude` on the handoff. A plain terminal gets the handoff copied and a command.
+// The desktop app fills a new chat from its own link. In a terminal multiplexer a pane beside
+// this one runs a fresh `claude` on the handoff. A plain terminal gets the handoff copied and a
+// command to run.
 async function startNew($: EngineInterface, surface: RenderSurface) {
   if (!handoffText) return
   const cwd = await $.session.cwd()
@@ -422,16 +426,16 @@ async function startNew($: EngineInterface, surface: RenderSurface) {
     await note($, r.exitCode === 0 ? 'A new chat is filled in with the handoff. Press Return there to start it.' : 'The new chat did not open. Use Copy handoff prompt instead.')
     return
   }
-  if (inZellij) {
+  if (mux?.beside) {
     // A child-session marker from this process would turn off transcript saving there.
-    const argv = ['zellij', 'run', '--name', 'Handoff', '--cwd', cwd, '--', 'env', '-u', 'CLAUDE_CODE_CHILD_SESSION', 'claude', firstPrompt()]
-    const r = await $.process.run(argv).catch(() => null)
-    if (r?.exitCode === 0) {
-      await log($, `started a new chat in zellij pane ${r.stdout.trim()}`)
-      await note($, 'Started a new chat with the handoff in the Zellij pane beside this one.')
+    const argv = ['env', '-u', 'CLAUDE_CODE_CHILD_SESSION', 'claude', firstPrompt()]
+    const pane = await $.mux.openBeside({ name: 'Handoff', cwd, argv }).catch(() => null)
+    if (pane) {
+      await log($, `started a new chat in ${pane.mux} pane ${pane.id}`)
+      await note($, 'Started a new chat with the handoff in the pane beside this one.')
     } else {
-      await log($, `zellij run failed: ${r ? r.stderr.trim().slice(0, 200) : 'no result'}`)
-      await note($, 'Zellij could not open a pane. Use Copy handoff prompt instead.')
+      await log($, `${mux.name} opened no pane for the new chat`)
+      await note($, 'The new pane did not open. Use Copy handoff prompt instead.')
     }
     return
   }
@@ -439,12 +443,26 @@ async function startNew($: EngineInterface, surface: RenderSurface) {
   await note($, (await copyText($, surface)) ? `Copied. Or in a new terminal run: ${run}` : `In a new terminal run: ${run}`)
 }
 
-// Zellij opens the file in the person's $EDITOR in a floating pane; elsewhere the Mac opens it.
+// A terminal multiplexer opens the file in the person's $EDITOR in a floating pane; elsewhere,
+// or when it cannot, the system opens it (open on a Mac, xdg-open elsewhere).
 async function openFile($: EngineInterface, surface: RenderSurface) {
   if (!handoffPath) return
-  const argv = surface === 'terminal' && inZellij ? ['zellij', 'edit', '--floating', handoffPath] : ['open', handoffPath]
-  const r = await $.process.run(argv).catch(() => null)
+  if (surface === 'terminal' && mux?.edit && (await $.mux.edit({ path: handoffPath, floating: true }).catch(() => null))) return
+  if (!opener) {
+    const r = await $.process.run(['uname', '-s']).catch(() => null)
+    opener = r?.stdout.trim() === 'Darwin' ? 'open' : 'xdg-open'
+  }
+  const r = await $.process.run([opener, handoffPath]).catch(() => null)
   if (r?.exitCode !== 0) await note($, `Could not open it. The file is ${tilde(handoffPath)}.`)
+}
+
+/** This chat's terminal multiplexer ($.mux.info()), or null with none. */
+async function muxInfo($: EngineInterface) {
+  try {
+    return await $.mux.info()
+  } catch {
+    return null
+  }
 }
 
 async function checkOffer($: EngineInterface) {
@@ -514,7 +532,7 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     sid = await $.session.id()
     home = (await $.env.get('HOME').catch(() => undefined)) ?? ''
-    inZellij = !!(await $.env.get('ZELLIJ').catch(() => undefined))
+    mux = await muxInfo($)
     const { value: wasHidden = false } = await $.state.get(HIDDEN)
     hidden = wasHidden
     await $.command.register({ name: 'handoff', description: 'Write a handoff of this chat now, then copy it or start a new chat with it' })

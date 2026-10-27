@@ -20,4 +20,9 @@ Added in 0.6.0:
   in a floating pane. The drawing helpers shared with the pane moved to
   hooks/text.ts.
 
+In 0.7.0:
+- The floating window goes through the multiplexer plugin's $.mux (a
+  dependency) instead of running zellij itself; with no multiplexer,
+  /helpers float opens the docked pane.
+
 Everything else is the upstream code.

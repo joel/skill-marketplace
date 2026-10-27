@@ -1,0 +1,11 @@
+{
+  "name": "multiplexer",
+  "version": "0.1.0",
+  "description": "One interface for terminal multiplexers ($.mux): floating panes, panes beside the chat, a floating editor. Zellij is supported; with none, every call answers null so each mod falls back on its own. Other multiplexers (tmux) plug in as a backend",
+  "author": {
+    "name": "Joel Azemar"
+  },
+  "repository": "https://github.com/joel/skill-marketplace",
+  "keywords": ["multiplexer", "zellij", "tmux", "terminal", "mod"],
+  "types": "./types/index.d.ts"
+}

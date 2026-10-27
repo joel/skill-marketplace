@@ -1,17 +1,11 @@
-// The Helper Desk as plain text for a Zellij floating pane.
+// The Helper Desk as plain text for a floating pane of the terminal multiplexer ($.mux).
 // The mod writes one frame per change to a file; hooks/float.sh, run in the floating pane,
 // redraws it. No pets or spinners here: a frame only changes when the desk does.
 
 import type { BandPlan, Helper } from '../types'
 import { clockTime, cut, hueOf, tokenText } from './text'
 
-/**
- * Where the floating pane opens: the bottom right of the screen, as shares of it, so it sits in
- * the corner at any terminal size (Zellij places x 55% with width 45% flush right, and y 45%
- * with height 55% flush with the bottom).
- */
-export const FLOAT_X = '55%'
-export const FLOAT_Y = '45%'
+/** The floating pane's size, as shares of the screen; it sits flush in the bottom right corner. */
 export const FLOAT_W = '45%'
 export const FLOAT_H = '55%'
 /** Columns a frame is drawn in before the viewer has said how wide its pane is. */
@@ -123,30 +117,22 @@ export function floatFrame({ helpers, plan, now, costUsd, width }: FloatInput): 
   return lines.map(l => `${l}${ESC}K`).join('\n')
 }
 
-/** The `zellij run` that opens the viewer beside the chat without taking the keyboard. */
-export function floatRunArgv(script: string, frameFile: string, title: string): string[] {
-  return [
-    'zellij',
-    'run',
-    '--floating',
-    '--pinned',
-    'true',
-    '--no-focus',
-    '--near-current-pane',
-    '--close-on-exit',
-    '--name',
-    title,
-    '--x',
-    FLOAT_X,
-    '--y',
-    FLOAT_Y,
-    '--width',
-    FLOAT_W,
-    '--height',
-    FLOAT_H,
-    '--',
-    'sh',
-    script,
-    frameFile,
-  ]
+/** A pane a multiplexer opened ($.mux): which one, and its id for the pane. */
+export type FloatPane = { mux: string; id: string }
+
+/**
+ * The floating pane to ask the multiplexer for ($.mux.openFloating): the viewer, in the bottom
+ * right corner, on top, leaving the keyboard with the chat, gone when the viewer quits.
+ */
+export function floatSpec(script: string, frameFile: string, title: string) {
+  return {
+    name: title,
+    argv: ['sh', script, frameFile],
+    anchor: 'bottom-right' as const,
+    width: FLOAT_W,
+    height: FLOAT_H,
+    pinned: true,
+    takeFocus: false,
+    closeOnExit: true,
+  }
 }

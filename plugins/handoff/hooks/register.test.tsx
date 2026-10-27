@@ -1,9 +1,26 @@
 import { expect, mock, test } from 'claude-code/testing'
 
+// handoff depends on the multiplexer plugin's $.mux. Each test loads this stand-in beside it:
+// every $.mux call becomes `fake-mux <call> <json>` on $.process.run, which a test answers and
+// records. An empty answer is null: no multiplexer, as most tests want.
+const fakeMux = {
+  name: 'multiplexer',
+  register(on: Parameters<NonNullable<Parameters<typeof test>[2]>>[1]) {
+    on('engine.create', async ($, e, next) => ({
+      ...(await next(e)),
+      mux: { info: async () => null, openFloating: async () => null, openBeside: async () => null, edit: async () => null, isOpen: async () => null, close: async () => undefined },
+    }))
+    const ask = async (out: { stdout: string }) => ({ value: JSON.parse(out.stdout || 'null') })
+    on('mux.info', async $ => ask(await $.process.run(['fake-mux', 'info', '{}'])))
+    on('mux.openBeside', async ($, e) => ask(await $.process.run(['fake-mux', 'openBeside', JSON.stringify(e)])))
+    on('mux.edit', async ($, e) => ask(await $.process.run(['fake-mux', 'edit', JSON.stringify(e)])))
+  },
+}
+
 const HANDOFF = '# Handoff: Build the refresh mod\n\nContinue work in `~/vault`. Goal: finish it.\n\n## Next steps\n1. Test it.'
 
 for (const surface of ['desktop', 'terminal'] as const) {
-  test(`offer at 250k, steps, then copy and start (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+  test(`offer at 250k, steps, then copy and start (${surface})`, { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
     let tokens = 120_000
     const files: Record<string, string> = {}
     const store: Record<string, unknown> = {}
@@ -128,7 +145,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
 }
 
 for (const surface of ['desktop', 'terminal'] as const) {
-  test(`Cache Clock request runs it; a failed model step keeps the draft and logs (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+  test(`Cache Clock request runs it; a failed model step keeps the draft and logs (${surface})`, { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
     // Cache Clock left a request file for this chat.
     let requested = true
     const files: Record<string, string> = {}
@@ -210,7 +227,14 @@ function rig(on: On, files: Record<string, string>, tokens: { value: number }, e
     const { argv } = e as { argv: string[] }
     runs.push(argv)
     if (argv[0] === 'rm') for (const path of argv.slice(1)) delete files[path]
-    return { value: { exitCode: 0, stdout: argv[0] === 'zellij' ? 'terminal_9\n' : '', stderr: '' } } as never
+    let stdout = ''
+    // The stand-in multiplexer: Zellij when the test sets ZELLIJ, else none.
+    if (argv[0] === 'fake-mux' && env.ZELLIJ) {
+      if (argv[1] === 'info') stdout = JSON.stringify({ name: 'zellij', floating: true, beside: true, edit: true })
+      if (argv[1] === 'openBeside' || argv[1] === 'edit') stdout = JSON.stringify({ mux: 'zellij', id: 'terminal_9' })
+    }
+    if (argv[0] === 'uname') stdout = `${env.UNAME ?? 'Darwin'}\n`
+    return { value: { exitCode: 0, stdout, stderr: '' } } as never
   })
   on('ui.copy', async ($, e) => {
     copies.push((e as { text: string }).text)
@@ -235,7 +259,7 @@ const begin = { source: 'startup', cwd: '/Users/test/vault', isInteractive: true
 const ZELLIJ = { ZELLIJ: '0' }
 
 for (const surface of ['desktop', 'terminal'] as const) {
-  test(`Hide on the offer keeps it away in this chat and writes no file (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+  test(`Hide on the offer keeps it away in this chat and writes no file (${surface})`, { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
     const files: Record<string, string> = {}
     const tokens = { value: 262_000 }
     const { clock, toasts } = rig(on, files, tokens)
@@ -270,7 +294,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
   })
 }
 
-test('offer: off never offers by itself, but /refresh and the tool still work', { timeoutMs: 30000, options: { offer: 'off' } }, async ($, on) => {
+test('offer: off never offers by itself, but /refresh and the tool still work', { plugins: [fakeMux], timeoutMs: 30000, options: { offer: 'off' } }, async ($, on) => {
   const tokens = { value: 400_000 }
   const { clock } = rig(on, {}, tokens)
   await $.session.start({ ...begin, surface: 'terminal' } as never)
@@ -287,7 +311,7 @@ test('offer: off never offers by itself, but /refresh and the tool still work', 
   expect(said, 'the tool answers').toContain('opens above the prompt')
 })
 
-test('offer_at moves the threshold', { timeoutMs: 30000, options: { offer_at: 100_000 } }, async ($, on) => {
+test('offer_at moves the threshold', { plugins: [fakeMux], timeoutMs: 30000, options: { offer_at: 100_000 } }, async ($, on) => {
   const tokens = { value: 90_000 }
   const { clock } = rig(on, {}, tokens)
   await $.session.start({ ...begin, surface: 'terminal' } as never)
@@ -301,7 +325,7 @@ test('offer_at moves the threshold', { timeoutMs: 30000, options: { offer_at: 10
   expect(await v.find({ key: 'refresh' }), 'offered at 110k').toBeDefined()
 })
 
-test('in Zellij, Start new chat opens a pane beside this one running claude on the handoff', { timeoutMs: 30000 }, async ($, on) => {
+test('in a multiplexer, Start new chat opens a pane beside this one running claude on the handoff', { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
   const files: Record<string, string> = {}
   const { clock, runs, copies } = rig(on, files, { value: 10_000 }, ZELLIJ)
   await $.session.start({ ...begin, surface: 'terminal' } as never)
@@ -311,19 +335,36 @@ test('in Zellij, Start new chat opens a pane beside this one running claude on t
   expect(await v.find({ key: 'start' }), 'ready').toBeDefined()
 
   await v.press({ key: 'start' })
-  const argv = runs.find(a => a[0] === 'zellij' && a[1] === 'run') ?? []
-  expect(argv.slice(0, 6), 'a named pane in the chat folder').toEqual(['zellij', 'run', '--name', 'Handoff', '--cwd', '/Users/test/vault'])
-  expect(argv.includes('--floating'), 'beside, not floating').toBe(false)
-  expect(argv.slice(6, 11), 'claude without the child-session marker').toEqual(['--', 'env', '-u', 'CLAUDE_CODE_CHILD_SESSION', 'claude'])
-  const prompt = argv[11] ?? ''
+  const asked = runs.find(a => a[0] === 'fake-mux' && a[1] === 'openBeside')
+  const spec = JSON.parse(asked?.[2] ?? '{}') as { name?: string; cwd?: string; argv?: string[] }
+  expect([spec.name, spec.cwd], 'a named pane in the chat folder').toEqual(['Handoff', '/Users/test/vault'])
+  expect(spec.argv?.slice(0, 4), 'claude without the child-session marker').toEqual(['env', '-u', 'CLAUDE_CODE_CHILD_SESSION', 'claude'])
+  const prompt = spec.argv?.[4] ?? ''
   expect(prompt.startsWith('#'), 'the first prompt never starts with #').toBe(false)
   expect(prompt, 'the handoff is the first prompt').toContain('# Handoff: Build the refresh mod')
+  expect(runs.some(a => a[0] === 'zellij'), 'no multiplexer command of its own').toBe(false)
   expect(copies, 'nothing copied').toEqual([])
   v = await $.ui.mount({ plugin: 'handoff', surface: 'terminal', component: 'AbovePrompt', props: offerProps })
-  expect(await v.find({ text: /Zellij pane beside this one/ }), 'the note says where').toBeDefined()
+  expect(await v.find({ text: /in the pane beside this one/ }), 'the note says where').toBeDefined()
 
   await v.press({ key: 'open' })
-  const edit = runs.find(a => a[0] === 'zellij' && a[1] === 'edit') ?? []
-  expect(edit.slice(0, 3), 'Open file floats an editor').toEqual(['zellij', 'edit', '--floating'])
-  expect(edit[3]?.startsWith('/Users/test/.claude/handoffs/'), 'the saved handoff').toBe(true)
+  const edit = JSON.parse(runs.find(a => a[0] === 'fake-mux' && a[1] === 'edit')?.[2] ?? '{}') as { path?: string; floating?: boolean }
+  expect(edit.floating, 'Open file floats an editor').toBe(true)
+  expect(edit.path?.startsWith('/Users/test/.claude/handoffs/'), 'the saved handoff').toBe(true)
+  expect(runs.some(a => a[0] === 'open' || a[0] === 'xdg-open'), 'no system opener').toBe(false)
 })
+
+for (const [system, opener] of [['Darwin', 'open'], ['Linux', 'xdg-open']] as const) {
+  test(`with no multiplexer, Open file uses the system's opener (${system})`, { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
+    const files: Record<string, string> = {}
+    const { clock, runs } = rig(on, files, { value: 10_000 }, { UNAME: system })
+    await $.session.start({ ...begin, surface: 'terminal' } as never)
+    await $.command.run({ command: 'handoff', args: '' } as never)
+    await clock.advance(10_000)
+    const v = await $.ui.mount({ plugin: 'handoff', surface: 'terminal', component: 'AbovePrompt', props: offerProps })
+    await v.press({ key: 'open' })
+    const opened = runs.find(a => a[0] === opener)
+    expect(opened?.[1]?.startsWith('/Users/test/.claude/handoffs/'), `${opener} the handoff`).toBe(true)
+    expect(runs.some(a => a[0] === 'fake-mux' && a[1] === 'edit'), 'no editor pane asked for').toBe(false)
+  })
+}
