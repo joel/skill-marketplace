@@ -67,6 +67,19 @@ forbids an entry without a directory.
 
 ## Release notes
 
+### plan-implementation 2.7.0 (2026-10-27)
+
+Review loop and merge gate. Every list call is paginated, and the
+unresolved-thread check follows `pageInfo` across every page. Clean verdicts
+are looked for on every channel a bot uses (review, inline comment, issue
+comment, an edited status comment, a reaction), with Codex's current behaviour
+as the worked example; a force-push may not retrigger the bot, so post one
+trigger and bound the wait. Review claims are verified in both directions,
+human counter-claims included, and replies never quote customer data. The
+merge gate needs every check on HEAD green, not only the required ones. A test
+that fails only in a grouped run but passes alone on the branch and on the
+base commit is reported as order-dependent.
+
 ### plan-implementation 2.6.0 (2026-10-27)
 
 Rebase hygiene. When the freshness check finds the branch behind `main`, the
