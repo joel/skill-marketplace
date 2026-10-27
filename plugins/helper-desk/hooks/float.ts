@@ -75,7 +75,8 @@ function cardLines(hp: Helper, now: number, w: number): string[] {
       : `Stopped before it finished · ${steps}`
   const out = [
     `${mark} ${bold(cut(hp.description, w - 2))}`,
-    `  ${dim(cut([who, meta].filter(Boolean).join(' · '), w - 2))}`,
+    // Tokens and time stay whole; the agent type and model give way first.
+    `  ${dim(meta ? `${cut(who, Math.max(0, w - 5 - meta.length))}${who ? ' · ' : ''}${meta}` : cut(who, w - 2))}`,
     `  ${fg(live ? ACCENT : hp.phase === 'done' ? GOOD : BAD, cut(lead, w - 2))}`,
   ]
   if (live) for (const st of hp.steps.slice(0, -1).slice(-2)) out.push(dim(cut(`    ${st.live}`, w)))

@@ -80,8 +80,11 @@ function rig(on: On, files: Record<string, string>, env: Record<string, string> 
   on('process.run', async ($, e) => {
     const argv = (e as { argv?: string[]; command?: string[] }).argv ?? (e as { command?: string[] }).command ?? []
     ran.push(argv)
-    const hit = argv[0] === 'rm' ? keyOf(files, argv[argv.length - 1]!) : undefined
-    if (hit) delete files[hit]
+    if (argv[0] === 'rm')
+      for (const path of argv.slice(1).filter(x => !x.startsWith('-'))) {
+        const hit = keyOf(files, path)
+        if (hit) delete files[hit]
+      }
     if (argv[0] === 'mv') {
       const [from, to] = argv.slice(-2) as [string, string]
       files[to] = files[from] ?? ''
@@ -655,4 +658,55 @@ test('a frame fits its width, shows the plan and every group', () => {
   const all = lines.join('\n')
   for (const want of ['3 subagents', '$0.42', 'Tasks 2/4', 'Now: Build the slides', 'Running · 1', 'Finished · 1', 'Stopped · 1', 'Reading x.md'])
     expect(all, want).toContain(want)
+})
+
+test('pane: float with two helpers starting together opens one float', { timeoutMs: 30000, options: { pane: 'float' } }, async ($, on) => {
+  const files: Record<string, string> = {}
+  const { ran, clock } = rig(on, files, ZELLIJ)
+  await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface: 'terminal', isInteractive: true } as never)
+  await Promise.all([spawn($, 'Build the landing page', 's1'), spawn($, 'Write the copy', 's2')])
+  await clock.settle()
+  expect(zellijRuns(ran), 'one float').toHaveLength(1)
+  const frame = files[FRAME] ?? ''
+  expect(frame, 'first card').toContain('Build the landing page')
+  expect(frame, 'second card').toContain('Write the copy')
+})
+
+test('pane: float in a chat nobody watches (claude -p) opens no float', { timeoutMs: 30000, options: { pane: 'float' } }, async ($, on) => {
+  const { ran, clock } = rig(on, {}, ZELLIJ)
+  await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface: 'terminal', isInteractive: false } as never)
+  await spawn($, 'Build the landing page', 's1')
+  await clock.settle()
+  expect(zellijRuns(ran), 'no float').toEqual([])
+})
+
+test('/clear keeps the float, and its frame file', { timeoutMs: 30000 }, async ($, on) => {
+  const files: Record<string, string> = {}
+  const { ran, clock } = rig(on, files, ZELLIJ)
+  on('session.end', async () => ({ sessionId: 'sess1' }) as never)
+  await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface: 'terminal', isInteractive: true } as never)
+  await clock.settle()
+  await $.command.run({ command: 'helpers', args: 'float' } as never)
+  await $.session.end({ reason: 'clear' } as never)
+  expect(ran.some(a => a[2] === 'close-pane'), 'not closed').toBe(false)
+  await spawn($, 'Build the landing page', 's1')
+  await clock.settle()
+  expect(files[FRAME] ?? '', 'still drawn to the same file').toContain('Build the landing page')
+})
+
+test('the float draws to the width its viewer reports', { timeoutMs: 30000 }, async ($, on) => {
+  const files: Record<string, string> = {}
+  const { clock } = rig(on, files, ZELLIJ)
+  await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface: 'terminal', isInteractive: true } as never)
+  await clock.settle()
+  await $.command.run({ command: 'helpers', args: 'float' } as never)
+  const widest = () => Math.max(...(files[FRAME] ?? '').split('\n').map(l => visible(l).length))
+  expect(widest() > 40, 'opened at its full width').toBe(true)
+  // Zellij gave the pane 40 columns; float.sh says so.
+  files[`${FRAME}.cols`] = '40\n'
+  await spawn($, 'A description long enough to need cutting when the pane is narrow', 's1')
+  await clock.settle()
+  expect(widest() <= 40, 'fits the pane').toBe(true)
+  await $.command.run({ command: 'helpers', args: 'float' } as never)
+  expect(`${FRAME}.cols` in files, 'width file removed with the pane').toBe(false)
 })

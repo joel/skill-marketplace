@@ -282,7 +282,7 @@ async function tick($: EngineInterface) {
   tickN += 1
   await $.state.set(CLOCK, { tick: tickN, now: await $.clock.now() })
   // The float has no spinner: about once a second is enough for its clocks.
-  if (tickN % FLOAT_TICKS === 0) await writeFrame($)
+  if (tickN % FLOAT_TICKS === 0) void writeFrame($)
 }
 
 async function readCost($: EngineInterface) {
@@ -378,7 +378,7 @@ async function addHelper($: EngineInterface, id: string, description: string, ty
   await publish($)
   // The pane opens by itself when a new round of helpers starts.
   if (!wasIdle || hidden) return
-  if (paneMode === 'float' && inZellij) void openFloat($).catch(err => log($, `float: ${String(err)}`))
+  if (paneMode === 'float' && inZellij && interactive) void openFloat($).catch(err => log($, `float: ${String(err)}`))
   else if (paneMode === 'auto' || paneMode === 'float') void $.ui.open({ id: PANE, title: TITLE }).catch(err => log($, `open: ${String(err)}`))
 }
 
@@ -703,70 +703,112 @@ async function toggleIn($: EngineInterface, field: 'open' | 'folded', id: string
 const FLOAT_TICKS = 3
 
 let inZellij = false
-// The floating pane's id ("terminal_7"), also kept in $.state so a reload neither loses nor doubles it.
+// Only a chat someone watches opens a float by itself, not `claude -p` started from a Zellij pane.
+let interactive = false
+// The floating pane's id ("terminal_7") and the frame file it reads, also kept in $.state so a
+// reload neither loses nor doubles it. The file is fixed at open: a /clear changes the session id.
 let floatPane = ''
+let floatFile = ''
 let lastFrame = ''
+// One open and one frame write at a time: two helpers starting together must not open two
+// panes, and an older frame must never land after a newer one.
+let opening: Promise<string> | null = null
+let writing: Promise<void> | null = null
+let dirty = false
 
 const framePath = () => `${home}/.claude/mods-state/helper-desk-${sessionId}.txt`
 
-async function saveFrame($: EngineInterface, text: string) {
+async function saveFrame($: EngineInterface, file: string, text: string) {
   if (!stateDirMade) {
     await $.process.run(['mkdir', '-p', `${home}/.claude/mods-state`])
     stateDirMade = true
   }
   // Written beside it, then moved over it, so the viewer never reads half a frame.
-  const tmp = `${framePath()}.tmp`
+  const tmp = `${file}.tmp`
   await $.fs.write(tmp, text)
-  await $.process.run(['mv', '-f', tmp, framePath()])
+  await $.process.run(['mv', '-f', tmp, file])
+}
+
+/** The width the viewer reported for its pane, else the width it was opened with. */
+async function floatWidth($: EngineInterface, file: string) {
+  const cols = await $.fs
+    .read(`${file}.cols`)
+    .then(t => parseInt(String(t), 10))
+    .catch(() => NaN)
+  return Number.isFinite(cols) && cols > 0 ? cols : FLOAT_W - 2
+}
+
+async function writeOnce($: EngineInterface, file: string) {
+  const { value: cost = { usd: null } } = await $.state.get(COST)
+  const shown = bandOn && planShown && !!plan?.steps.length
+  const text = floatFrame({
+    helpers,
+    plan: plan ? { title: plan.title, steps: plan.steps.map(st => ({ text: st.text, status: st.status })), shown } : null,
+    now: await $.clock.now(),
+    costUsd: cost.usd,
+    width: await floatWidth($, file),
+  })
+  if (text === lastFrame) return
+  lastFrame = text
+  await saveFrame($, file, text)
 }
 
 /** The frame for the float, written only while it is open and only when it changed. */
-async function writeFrame($: EngineInterface) {
-  if (!floatPane || !home || !sessionId) return
-  try {
-    const { value: cost = { usd: null } } = await $.state.get(COST)
-    const shown = bandOn && planShown && !!plan?.steps.length
-    const text = floatFrame({
-      helpers,
-      plan: plan ? { title: plan.title, steps: plan.steps.map(st => ({ text: st.text, status: st.status })), shown } : null,
-      now: await $.clock.now(),
-      costUsd: cost.usd,
-      width: FLOAT_W - 2,
-    })
-    if (text === lastFrame) return
-    lastFrame = text
-    await saveFrame($, text)
-  } catch (err) {
-    await log($, `frame: ${String(err)}`)
+function writeFrame($: EngineInterface): Promise<void> {
+  if (!floatPane || !floatFile) return Promise.resolve()
+  // A change during a write is drawn from the state as it is once that write is done.
+  if (writing) {
+    dirty = true
+    return writing
   }
+  writing = (async () => {
+    do {
+      dirty = false
+      await writeOnce($, floatFile).catch(err => log($, `frame: ${String(err)}`))
+    } while (dirty && floatPane)
+  })().finally(() => {
+    writing = null
+  })
+  return writing
 }
 
-/** True while Zellij still lists the pane; the viewer's q closes it behind the mod's back. */
+/** False once Zellij no longer lists the pane (the viewer's q closes it); true when it cannot tell. */
 async function floatAlive($: EngineInterface, id: string) {
   const r = await $.process.run(['zellij', 'action', 'list-panes']).catch(() => null)
-  return !!r && r.exitCode === 0 && new RegExp(`(^|\\s)${id}(\\s|$)`, 'm').test(r.stdout)
+  if (!r || r.exitCode !== 0) return true
+  return new RegExp(`(^|\\s)${id}(\\s|$)`, 'm').test(r.stdout)
 }
 
 /** Opens the float, or says why not. */
-async function openFloat($: EngineInterface): Promise<string> {
+function openFloat($: EngineInterface): Promise<string> {
+  opening ??= doOpenFloat($).finally(() => {
+    opening = null
+  })
+  return opening
+}
+
+async function doOpenFloat($: EngineInterface): Promise<string> {
   if (!inZellij) return `${TITLE} floats only inside Zellij. Type /helpers for the docked pane.`
   if (!home || !sessionId) return `${TITLE} cannot float here: no home folder or session id.`
   if (floatPane && (await floatAlive($, floatPane))) return `${TITLE} is already floating.`
-  floatPane = 'opening'
+  const file = framePath()
   lastFrame = ''
-  await writeFrame($)
-  const r = await $.process.run(floatRunArgv(`${$.plugin.root}/hooks/float.sh`, framePath(), TITLE)).catch(err => {
+  await writeOnce($, file)
+  const r = await $.process.run(floatRunArgv(`${$.plugin.root}/hooks/float.sh`, file, TITLE)).catch(err => {
     void log($, `zellij run: ${String(err)}`)
     return null
   })
-  const id = r && r.exitCode === 0 ? r.stdout.trim().split(/\s+/).pop() ?? '' : ''
+  const id = r && r.exitCode === 0 ? (r.stdout.trim().split(/\s+/).pop() ?? '') : ''
   if (!id) {
-    floatPane = ''
     if (r) await log($, `zellij run: exit ${r.exitCode} ${r.stderr.trim()}`)
+    await $.process.run(['rm', '-f', file]).catch(() => undefined)
     return `${TITLE} could not open a floating pane. See ~/.claude/mods-logs/${NAME}.log.`
   }
   floatPane = id
-  await $.state.set(FLOAT, { paneId: id })
+  floatFile = file
+  await $.state.set(FLOAT, { paneId: id, file })
+  // Anything that changed while the pane opened.
+  await writeFrame($)
   return `${TITLE} is floating. Type /helpers float again to close it.`
 }
 
@@ -774,12 +816,15 @@ async function openFloat($: EngineInterface): Promise<string> {
 async function closeFloat($: EngineInterface) {
   if (!floatPane) return
   const id = floatPane
+  const file = floatFile
   floatPane = ''
+  floatFile = ''
   lastFrame = ''
+  await writing
   await $.state.set(FLOAT, null)
-  await saveFrame($, `${ENDED}\n`).catch(() => undefined)
+  await saveFrame($, file, `${ENDED}\n`).catch(() => undefined)
   await $.process.run(['zellij', 'action', 'close-pane', '--pane-id', id]).catch(() => undefined)
-  await $.process.run(['rm', '-f', framePath()]).catch(() => undefined)
+  await $.process.run(['rm', '-f', file, `${file}.cols`]).catch(() => undefined)
 }
 
 // ---------- Drawing ----------
@@ -991,8 +1036,13 @@ export const register: Register = (on, options) => {
     const { value: wasHidden = false } = await $.state.get(HIDDEN)
     hidden = wasHidden
     inZellij = !!(await $.env.get('ZELLIJ').catch(() => undefined))
+    interactive = e.isInteractive
+    // A reload starts the module over: take the open float back from $.state.
     const { value: floated = null } = await $.state.get(FLOAT)
-    floatPane = floated?.paneId ?? ''
+    if (!floatPane && floated) {
+      floatPane = floated.paneId
+      floatFile = floated.file
+    }
     await loadPlan($)
     // A reload keeps the drawn copy: carry on from it.
     if (!helpers.length) {
@@ -1105,8 +1155,9 @@ export const register: Register = (on, options) => {
 
   // A new prompt is a new task: the plan nudge counts from zero.
   // The float goes with the chat; the viewer also quits by itself when its file goes.
+  // After /clear or a resume the process carries on, and so does the float.
   on('session.end', async ($, e, next) => {
-    await closeFloat($).catch(err => log($, `close float: ${String(err)}`))
+    if (e.reason !== 'clear' && e.reason !== 'resume') await closeFloat($).catch(err => log($, `close float: ${String(err)}`))
     return next(e)
   })
 

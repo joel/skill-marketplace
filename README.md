@@ -82,11 +82,17 @@ while helpers run.
 How it works: the mod writes each frame to
 `~/.claude/mods-state/helper-desk-<session>.txt` (written to a temp file and
 moved into place), and `hooks/float.sh`, a POSIX `sh` loop with no other
-dependency, redraws it in the pane. The pane id is kept in session state,
-so a plugin reload never opens a second window. The pane closes and its
-file is removed when the chat ends. After a crash, the window keeps its last
-frame until `q`. The pane opens 66 columns wide and is not reflowed when
-resized.
+dependency, redraws it in the pane. The viewer reports the pane's width
+beside the frame, so the next frame fits a narrower or resized pane. Lines
+are cut at the edge, never wrapped.
+- **One window.** Helpers that start together open one window. The pane id
+  is kept in session state, so a plugin reload never opens a second one.
+- **Interactive chats only.** `pane: float` opens the window by itself only
+  in chats someone is watching, never under `claude -p`.
+- **Closing.** The window stays open across `/clear` and a resume. It closes
+  and its files are removed when Claude Code exits. After a crash, it keeps
+  its last frame until `q`.
+- **Tested on** Zellij 0.45.1.
 
 ### helper-desk 0.5.0 (2026-10-27)
 

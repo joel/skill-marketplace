@@ -2,23 +2,32 @@
 # Helper Desk in a Zellij floating pane: redraws the frame file helper-desk writes; q quits.
 # helper-desk replaces the file whole on each change. A first line of "#ended", or no file,
 # ends the viewer, and zellij closes the pane (it was opened with --close-on-exit).
+# The pane's width goes to "<frame>.cols", so the next frame is drawn to fit it.
 frame=$1
 saved=$(stty -g 2>/dev/null)
 restore() {
-  printf '\033[?25h'
+  printf '\033[?25h\033[?7h'
   [ -n "$saved" ] && stty "$saved" 2>/dev/null
 }
 trap restore EXIT
 trap 'exit 0' INT TERM HUP
 # Keys arrive one at a time and without waiting, so q works between redraws.
 stty -icanon -echo min 0 time 0 2>/dev/null
-printf '\033[?25l\033[2J'
+# No cursor, and no wrapping: a line wider than the pane is cut at its edge.
+printf '\033[?25l\033[?7l\033[2J'
 old=
 oldrows=
+oldcols=
 while [ -f "$frame" ]; do
   new=$(cat "$frame" 2>/dev/null) || break
   case $new in '#ended'*) break ;; esac
-  rows=$(stty size 2>/dev/null | cut -d' ' -f1)
+  size=$(stty size 2>/dev/null)
+  rows=${size% *}
+  cols=${size#* }
+  if [ -n "$cols" ] && [ "$cols" != "$oldcols" ]; then
+    printf '%s\n' "$cols" > "$frame.cols"
+    oldcols=$cols
+  fi
   if [ "$new" != "$old" ] || [ "$rows" != "$oldrows" ]; then
     # Home, the frame cut to the pane's height, then clear what is left below it.
     printf '\033[H%s\033[J' "$(printf '%s\n' "$new" | head -n "${rows:-40}")"
