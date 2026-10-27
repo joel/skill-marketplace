@@ -13,8 +13,6 @@ const DEMO_MS = 60_000
 // A cold chat this big gets the handoff button: re-reading it costs the most.
 const BIG = 150_000
 const BAR = 20
-// Narrower than this, the band splits its one row into three, so nothing wraps.
-const WIDE = 120
 const MIN_BAR = 8
 // The handoff mod takes a request within 5 s; one still there after this means it is not running.
 const HANDOFF_WAIT_MS = 7_000
@@ -418,10 +416,19 @@ export const register: Register = on => {
     const left = c.lastEnd + c.ttlMs - c.now
     const cost = `${short(c.tokens)} tokens`
     const w = await getWarm($)
-    // A terminal narrower than WIDE gets three rows (clock, cost, buttons) in place of one, so
-    // nothing wraps; the tip costs two more rows, so it shows there only while keeping warm.
+    // When the one-row band (its text, then its buttons) would not fit, it becomes three rows
+    // (clock, cost, buttons), so nothing wraps; the tip costs two more rows, so it shows there
+    // only while keeping warm. Widths are counted in characters: each glyph here is one cell.
     const cols = typeof e.props.bodyColumns === 'number' && e.props.bodyColumns > 0 ? Math.floor(e.props.bodyColumns) : 0
-    const narrow = cols > 0 && cols < WIDE
+    const big = c.tokens >= BIG || c.ttlSource === 'demo'
+    const labels = [left > 0 ? '' : big ? 'Hand off to a fresh chat' : '', w ? 'Stop keeping warm' : 'Keep warm', 'Hide'].filter(Boolean)
+    const buttonsW = labels.reduce((n, l) => n + l.length + 5, 0)
+    const oneRow =
+      left > 0
+        ? `◷ Cache warm ${mmss(left)} ${'━'.repeat(BAR)} ${lengthLabel(c)}. Reply now and ${cost} cost 5 to 10% as much.`
+        : `❄ Cache cold since ${ago(-left)}. Your next message re-reads ${cost} at full cost.`
+    // The engine keeps the last few columns for its own [-] control.
+    const narrow = cols > 0 && cols < oneRow.length + buttonsW + 6
     const roomy = typeof e.props.maxRows !== 'number' || e.props.maxRows >= 6
     const warmButton = w ? <Button key="keepwarm" label="Stop keeping warm" onPress={noop} /> : <Button key="keepwarm" label="Keep warm" onPress={noop} />
     const warmRow = w ? (
@@ -482,8 +489,7 @@ export const register: Register = on => {
       )
     }
 
-    // The 60 s demo always shows the button, so it can be filmed in a small chat.
-    const big = c.tokens >= BIG || c.ttlSource === 'demo'
+    // The 60 s demo always shows the button (big, above), so it can be filmed in a small chat.
     const coldButtons = (
       <Box key="buttons" flexDirection="row" gap={1}>
         {big ? <Button key="handoff" label="Hand off to a fresh chat" variant="primary" onPress={noop} /> : null}

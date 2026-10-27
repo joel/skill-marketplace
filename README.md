@@ -86,9 +86,10 @@ what changed).
   3 MB of the chat's transcript with `tail`, at the path Claude Code's Stop
   hook gives. With no transcript, the clock says its 5 min length is a
   guess.
-- **Terminal.** Under 120 columns the band uses three short rows: the clock
-  with a shorter bar, the cost, then the buttons. It shows the tip only while
-  keeping warm, so nothing wraps in a narrow terminal or Zellij pane.
+- **Terminal.** When Ben's one-row band would wrap (it needs about 165
+  columns), the band uses three short rows instead: the clock with a shorter
+  bar, the cost, then the buttons. It then shows the tip only while keeping
+  warm, so nothing wraps in a normal terminal or Zellij pane.
 - **Handoff.** The cold row's "Hand off to a fresh chat" runs the handoff
   mod. If handoff isn't running, the band says so after 7 s, instead of
   leaving the request behind.

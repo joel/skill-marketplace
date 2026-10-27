@@ -14,6 +14,6 @@ Changes from 0.3.0 (in 0.4.0):
   gives.
 - A handoff request the handoff mod does not take within 7 s is removed, and
   the band says the handoff mod is not running.
-- Under 120 columns the band uses three short rows instead of one long one.
+- When its one row would wrap, the band uses three short rows instead.
 - Tests were rewritten to match the changes above.
 Everything else is the upstream code.

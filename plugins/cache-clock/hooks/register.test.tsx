@@ -92,7 +92,7 @@ function rig(on: On, seed: Partial<Rig> = {}) {
   return { r, clock }
 }
 
-const band = (bodyColumns = 160, maxRows = 10) => ({ isWorking: false, hasSurvey: false, maxRows, bodyColumns }) as never
+const band = (bodyColumns = 200, maxRows = 10) => ({ isWorking: false, hasSurvey: false, maxRows, bodyColumns }) as never
 const begin = { source: 'startup', cwd: '/Users/test/vault', isInteractive: true } as const
 
 for (const surface of ['desktop', 'terminal'] as const) {
@@ -262,7 +262,7 @@ test('a short band drops the cost line and the tip first', { timeoutMs: 30000 },
 for (const surface of ['desktop', 'terminal'] as const) {
   test(`keep warm: the button turns it on, a ping fires before expiry, a prompt stops it (${surface})`, { timeoutMs: 60000 }, async ($, on) => {
     const { r, clock } = rig(on)
-    const props = band(120)
+    const props = band(200)
     await $.session.start({ ...begin, surface } as never)
     await $.turn.complete({ answer: '' } as never)
     await clock.settle()
@@ -311,7 +311,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
 for (const surface of ['desktop', 'terminal'] as const) {
   test(`keep warm stops by itself after 30 pings, and says when the cache had gone cold (${surface})`, { timeoutMs: 120000 }, async ($, on) => {
     const { r, clock } = rig(on)
-    const props = band(120)
+    const props = band(200)
     await $.session.start({ ...begin, surface } as never)
     // The 60 s demo cache pings every 15 s, so 30 pings fit well inside the 2 hour cap.
     await $.command.run({ command: 'cacheclock', args: 'demo' } as never)
@@ -349,3 +349,15 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await v.find({ text: /Keeping warm/ }), 'off by the command').toBeUndefined()
   })
 }
+
+test('a band whose one row would wrap at 160 columns splits instead', { timeoutMs: 30000 }, async ($, on) => {
+  // A 1 hour cache has the longest label: its one row and buttons need about 165 columns.
+  const { clock } = rig(on, { transcript: tailOf(reply('1h')) })
+  await $.session.start({ ...begin, surface: 'terminal' } as never)
+  await $.turn.complete({ answer: '' } as never)
+  await clock.settle()
+  let v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band(160) })
+  expect(await v.find({ text: /1 h cache$/ }), 'three rows at 160').toBeDefined()
+  v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band(200) })
+  expect(await v.find({ text: /1 hour cache, as Anthropic's last reply set it/ }), 'one row at 200').toBeDefined()
+})
