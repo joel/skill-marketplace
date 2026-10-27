@@ -70,6 +70,15 @@ forbids an entry without a directory.
 
 ## Release notes
 
+### helper-desk 0.6.1 (2026-10-27)
+
+The Zellij floating window (`/helpers float`, `pane: float`) opens in the
+bottom right corner instead of the middle of the screen. It takes 45% of the
+width and 55% of the height, so it stays in the corner at any terminal size.
+The first frame now fits a narrow pane and is redrawn once the window has
+reported its real width. The empty-desk line no longer runs past a narrow
+pane's edge.
+
 ### cache-clock 0.4.0 (2026-10-27)
 
 First release here, based on Ben AI's cache-clock 0.3.0 (its `NOTICE` lists
@@ -120,8 +129,8 @@ over the chat, so it costs about one reply on a big context.
 ### helper-desk 0.6.0 (2026-10-27)
 
 A Zellij floating window for the desk. Inside Zellij, `/helpers float` opens
-the Helper Desk in a pinned floating pane that leaves the keyboard with
-Claude; running it again closes the pane, and so does `q` in the window.
+the Helper Desk in a pinned floating pane in the bottom right corner that
+leaves the keyboard with Claude; running it again closes the pane, and so does `q` in the window.
 Set `pane` to `float` in `/config` to have it open by itself when subagents
 start (outside Zellij that setting falls back to the docked pane). The window
 shows the plan bar and one text card per subagent (step, tokens, time), with

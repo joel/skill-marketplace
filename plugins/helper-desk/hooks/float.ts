@@ -5,9 +5,19 @@
 import type { BandPlan, Helper } from '../types'
 import { clockTime, cut, hueOf, tokenText } from './text'
 
-/** Columns the floating pane opens with; its border takes 2 of them. */
-export const FLOAT_W = 66
-export const FLOAT_H = '70%'
+/**
+ * Where the floating pane opens: the bottom right of the screen, as shares of it, so it sits in
+ * the corner at any terminal size (Zellij places x 55% with width 45% flush right, and y 45%
+ * with height 55% flush with the bottom).
+ */
+export const FLOAT_X = '55%'
+export const FLOAT_Y = '45%'
+export const FLOAT_W = '45%'
+export const FLOAT_H = '55%'
+/** Columns a frame is drawn in before the viewer has said how wide its pane is. */
+export const FLOAT_COLS = 40
+/** How soon after opening the frame is drawn again, once the viewer has reported its width. */
+export const FLOAT_REFIT_MS = 1500
 /** The first line of a frame that tells the viewer to quit. */
 export const ENDED = '#ended'
 
@@ -103,7 +113,7 @@ export function floatFrame({ helpers, plan, now, costUsd, width }: FloatInput): 
   const count = helpers.length ? `${helpers.length} subagent${helpers.length === 1 ? '' : 's'}` : 'No subagents yet'
   const lines = [`${bold(fg(running.length ? ACCENT : helpers.length ? GOOD : P_MID, count))}  ${dim(cut(facts.join(' · '), w - count.length - 2))}`, '']
   if (plan?.shown && plan.steps.length) lines.push(...planLines(plan, w), '')
-  if (!helpers.length) lines.push(dim('Cards show up here when Claude starts a subagent.'), '')
+  if (!helpers.length) lines.push(dim(cut('Cards show up here when Claude starts a subagent.', w)), '')
   for (const [title, color, members] of groups) {
     if (!members.length) continue
     lines.push(bold(fg(color, `${title} · ${members.length}`)))
@@ -126,8 +136,12 @@ export function floatRunArgv(script: string, frameFile: string, title: string): 
     '--close-on-exit',
     '--name',
     title,
+    '--x',
+    FLOAT_X,
+    '--y',
+    FLOAT_Y,
     '--width',
-    String(FLOAT_W),
+    FLOAT_W,
     '--height',
     FLOAT_H,
     '--',

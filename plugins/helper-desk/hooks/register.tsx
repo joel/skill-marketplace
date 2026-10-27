@@ -2,7 +2,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { BandPlan, Helper, HelperPhase, PlanStatus, Step, StepKind } from '../types'
 import { connectorName, splitTool } from './connectors'
-import { ENDED, FLOAT_W, floatFrame, floatRunArgv } from './float'
+import { ENDED, FLOAT_COLS, FLOAT_REFIT_MS, floatFrame, floatRunArgv } from './float'
 import { HUES, clockTime, cut, hueOf, tokenText } from './text'
 
 const NAME = 'helper-desk'
@@ -729,13 +729,13 @@ async function saveFrame($: EngineInterface, file: string, text: string) {
   await $.process.run(['mv', '-f', tmp, file])
 }
 
-/** The width the viewer reported for its pane, else the width it was opened with. */
+/** The width the viewer reported for its pane, else a guess that fits a narrow one. */
 async function floatWidth($: EngineInterface, file: string) {
   const cols = await $.fs
     .read(`${file}.cols`)
     .then(t => parseInt(String(t), 10))
     .catch(() => NaN)
-  return Number.isFinite(cols) && cols > 0 ? cols : FLOAT_W - 2
+  return Number.isFinite(cols) && cols > 0 ? cols : FLOAT_COLS
 }
 
 async function writeOnce($: EngineInterface, file: string) {
@@ -809,6 +809,10 @@ async function doOpenFloat($: EngineInterface): Promise<string> {
   await $.state.set(FLOAT, { paneId: id, file })
   // Anything that changed while the pane opened.
   await writeFrame($)
+  // The first frame guessed the width: draw it again once the viewer has reported its pane's.
+  $.clock.after(FLOAT_REFIT_MS, () => {
+    void writeFrame($)
+  })
   return `${TITLE} is floating. Type /helpers float again to close it.`
 }
 
