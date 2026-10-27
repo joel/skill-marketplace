@@ -97,6 +97,22 @@
         "path": "plugins/handoff",
         "ref": "main"
       }
+    },
+    {
+      "name": "cache-clock",
+      "description": "Counts down until the chat's prompt cache goes cold, above the prompt. When a big chat goes cold, offers a handoff to a fresh chat. Keep warm pings the cache in the background so it does not go cold",
+      "author": {
+        "name": "Ben AI",
+        "url": "https://www.benai.co"
+      },
+      "category": "productivity",
+      "version": "0.4.0",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/joel/skill-marketplace.git",
+        "path": "plugins/cache-clock",
+        "ref": "main"
+      }
     }
   ]
 }
