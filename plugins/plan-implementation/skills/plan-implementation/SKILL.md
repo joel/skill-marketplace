@@ -16,7 +16,7 @@ description: >-
   own workflow doc. Do not engage for questions or read-only analysis; defer
   to a project-local skill with the same job when one exists.
 metadata:
-  version: "2.4.0"
+  version: "2.5.0"
   origin: "Genericised from a production Rails project's execution-plan skill"
 ---
 
@@ -174,12 +174,30 @@ Update the status field using the IDs from the project config. When work starts
 immediately after issue creation, move straight to In Progress and skip the Ready
 hop. Commands and ID discovery in [github-projects.md](references/github-projects.md).
 
-### Step 4: Create the branch
+### Step 4: Create the branch in its own worktree
+
+Several sessions or agents often share one checkout, and a `git checkout` there moves
+every session's HEAD at once: a parallel session can switch branches under you and
+leave your edit beside its uncommitted files. So every effort works in **its own
+worktree from its first edit**. In the main checkout, never switch branches, stash
+or reset: its uncommitted changes may belong to someone else.
+
+Check where you are first (`git worktree list`, then `git status` in the worktree).
+Resuming an effort that already has a branch? Work in its existing worktree; never
+create a second branch for the same effort.
 
 ```bash
-git checkout main && git pull origin main
-git checkout -b feature/<descriptive-name>
+git fetch origin main
+git worktree add ../<repo>-wt-<slug> -b feature/<descriptive-name> origin/main
 ```
+
+A fresh worktree has no gitignored files: run the project's worktree setup (copy the
+local config the app and tests need, install dependencies). For a branch that exists
+only on the remote (a bot's PR), fetch it explicitly first
+(`git fetch origin +refs/heads/<branch>:refs/remotes/origin/<branch>`), then
+`git worktree add <path> -b <branch> origin/<branch>`. Run every edit, test, commit
+and push from the worktree, and point `/code-review` and the sub-agents at it. The
+harness's own worktree support is fine when these rules hold.
 
 Prefixes: `feature/*`, `fix/*`, `docs/*`, `refactor/*`, unless the project doc says
 otherwise.
@@ -316,24 +334,14 @@ silently skip a production deploy.
 
 ### Step 8: Live verification (runtime test)
 
-After committing and before pushing, verify the change running in the real app. If
-the project has a product-review or verify skill, use it. Otherwise:
-
-1. Start the app with the new code using the project's run commands (rebuild first
-   if dependencies changed; rebuild assets if the change added new pins or styles).
-2. Sign in using the project's documented dev login recipe.
-3. Drive the changed journey end-to-end in a real browser (an agent-driven browser
-   or a browser MCP): every state the surface renders, dark and light themes, a
-   mobile viewport, and DOM assertions for what a screenshot cannot show (aria
-   attributes, computed styles, selected options).
-4. Fix anything found, commit the fix, and re-run the test suite.
-
-**Auth, cookie, or session changes: verify the wire, not just the screen.** Cookie
-scope and isolation are invisible in a snapshot. Capture the raw `Set-Cookie` headers
-with `curl` and a cookie jar, and assert: every auth cookie is host-only (Netscape jar
-field 2 is `FALSE`; an explicit `Domain=` equal to the host still records `TRUE` and
-is not host-only), a cookie set on host A does not authenticate host B, single-use
-tokens reject on replay, and expired or garbage tokens land on the failure page.
+After committing and before pushing, verify the change running in the real app, with
+the project's product-review or verify skill if it has one. Otherwise start the app
+from the worktree, sign in with the dev login recipe, and drive every changed journey
+end to end in a real browser: every state, both themes, a mobile viewport, and DOM
+assertions for what a screenshot cannot show. Fix what breaks into the relevant
+commit and re-run the tests. **Auth, cookie or session changes also verify the wire**
+with `curl`, not just the screen. Procedure and checks:
+[live-verify.md](references/live-verify.md).
 
 ### Step 8b: Documentation and diagrams (mandatory for cross-cutting work)
 
@@ -419,6 +427,9 @@ API recipes for reading, replying, and resolving threads (including the reply
 endpoint that returns 404 without the PR number) are in
 [pr-review-threads.md](references/pr-review-threads.md).
 
+A round that lands after the developer's checkout moved on is fixed in the PR's own
+worktree; never switch or dirty the developer's checkout.
+
 When the review loop is done, run **consolidation Pass 2** over what CI and the
 reviews taught. It reports, it never commits to this PR (Step 15).
 
@@ -452,28 +463,18 @@ checks follow the project's docs-PR convention (often an admin merge).
 
 ### Step 13: Tag and publish a release (optional, after merge)
 
-If the project versions releases, follow its release policy immediately after merge.
-Re-run the freshness check (`git fetch --tags`) and confirm the intended version is
-free. If the project keeps a curated changelog, fill the entry **before** tagging, in
-the same PR as the feature when practical, so the tag captures it. Auto-generated
-release notes do not replace the curated entry. Check for drift: the changelog's
-newest heading should be the previous tag; backfill from release notes if not.
-
-```bash
-git checkout main && git pull origin main
-# First confirm the merge commit's own main CI run is green (sha from
-# `gh pr view <PR> --json mergeCommit`), not the PR-head checks.
-gh release view <tag> --repo <owner>/<repo> >/dev/null 2>&1 \
-  && echo "<tag> already released, skip" \
-  || gh release create <tag> --repo <owner>/<repo> --target main --title "<title>" --generate-notes
-```
+If the project versions releases, follow its release policy right after merge: the
+curated changelog entry is filled **before** tagging, the intended version is free,
+and the merge commit's own `main` run is green. Commands and checks:
+[release.md](references/release.md).
 
 ### Step 14: Move the issue to Done
 
 Board update with the Done option ID. Post the **closing summary**, a few lines each:
 what shipped, what was accepted or deferred and why, what verification ran, the
 Knowledge consolidation report (Step 15), and the follow-up issues filed. Copy it to
-the audit log if used.
+the audit log if used. Once the PR is merged, remove the effort's worktree
+(`git worktree remove <path>`) and its local branch; when a human merges, say so.
 
 ### Step 15: Knowledge consolidation report (mandatory)
 
@@ -495,10 +496,10 @@ repository; Pass 2 only reported.
 
 ```
 0.  explorer + architect agents (×2-3)          → Design pass (feature/multi-file; skip if trivial)
-1.  gh issue create (+ audit, candidate log)   → Issue with plan grounded in the design pass
+1.  gh issue create (+ audit, candidate log)    → Issue with plan grounded in the design pass
 2.  gh project item-add                         → Add to board (Backlog)
 3.  gh project item-edit                        → In Progress
-4.  git checkout -b feature/                    → Branch
+4.  git worktree add … origin/main              → Branch in its own worktree; never switch the shared checkout
 4b. Explore agent (skip if trivial)             → Orientation brief; again after every compaction
 5.  implement the blueprint                     → Respect module boundaries; never weaken enforcement
 5b. extend seeds (+ run seeds twice)            → Showcase-ready demo data
@@ -514,6 +515,6 @@ repository; Pass 2 only reported.
 11. read + reply + resolve every thread         → Human and bot; then Pass 2 (report only)
 12. QA notes, then merge per project policy     → Agent merges only if the project grants it
 13. changelog first, then gh release create     → Optional
-14. gh project item-edit + closing summary      → Done
+14. gh project item-edit + closing summary      → Done; remove the worktree after merge
 15. knowledge report + follow-up issues         → The repository remembers, never agent memory
 ```
