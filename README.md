@@ -15,6 +15,7 @@ Marketplace name: `joel-skills`. Catalog: `.claude-plugin/marketplace.json`.
 | `joel-tone` | Rewrites drafts, emails, Slack messages, proposals, or LLM-generated copy into Joel's voice so they read like a careful human wrote them. Picks the register first (public Vogon Partners copy or Joel's own messages), then applies the hard rules: no em or en dashes, no invented facts, no empty intensifiers, no filled-template rhythm. Ships the public-website voice brief as a reference. Returns paste-ready text plus a short note on what changed and what to check. |
 | `helper-desk` | A Claude Code mod (a hooks module, not a skill) by [Ben AI](https://www.benai.co), redistributed with permission. A purple task bar above the prompt fills as Claude ticks off its plan, and the Helper Desk pane shows one live card per subagent: its current step, tokens, time and a progress bar. Registers a `plan` tool and `/helpers`, and adds a short system-prompt section plus plan nudges to every session while it is enabled. Built and tested on Claude Code 2.1.311 (upstream 0.4.0 needed 2.1.287 or newer). See [helper-desk 0.5.0](#helper-desk-050-2026-10-27). |
 | `handoff` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. When a chat reaches 250k tokens (configurable), a Refresh row offers to move the work to a fresh chat. It writes a handoff of the whole chat (what was asked, decided and done, files to open, next steps) with one model call, saves a draft first, and keeps every handoff in `~/.claude/handoffs/`. Then it copies the handoff, or starts the new chat: in a Zellij pane beside this one, or in the desktop app. `/refresh` shows the row, `/handoff` writes one now. Pairs with cache-clock's "Hand off" button. See [handoff 0.2.0](#handoff-020-2026-10-27). |
+| `cache-clock` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. Counts down above the prompt until the chat's prompt cache goes cold (5 min or 1 hour, read from the chat's transcript), so you know when a reply is still cheap. Keep warm (`/keepwarm`) sends a tiny background ping before the cache expires. When a big chat goes cold, "Hand off to a fresh chat" runs the handoff mod, so install both. Fits narrow terminals and Zellij panes. See [cache-clock 0.4.0](#cache-clock-040-2026-10-27). |
 
 ## Installation (one-time, per machine)
 
@@ -68,6 +69,30 @@ allowed), and it is the only PR that bumps the version. A rename cannot land on
 forbids an entry without a directory.
 
 ## Release notes
+
+### cache-clock 0.4.0 (2026-10-27)
+
+First release here, based on Ben AI's cache-clock 0.3.0 (its `NOTICE` lists
+what changed).
+
+- **Keep warm costs real model calls.** Each ping is one small
+  `$.model.fork` reply that reads the chat from cache, about 5 to 10% of a
+  normal reply on the same context. It stops after 2 hours, 30 pings, 3
+  failures in a row, or your next message. It is off until you turn it on.
+- **Switches are Claude Code's own.** Turn it off with `/plugin disable
+  cache-clock`. Hide and `/cacheclock hide` hide it in the current chat;
+  `/cacheclock` shows it again.
+- **No python3.** The 5 min versus 1 hour cache length is read from the last
+  3 MB of the chat's transcript with `tail`, at the path Claude Code's Stop
+  hook gives. With no transcript, the clock says its 5 min length is a
+  guess.
+- **Terminal.** When Ben's one-row band would wrap (it needs about 165
+  columns), the band uses three short rows instead: the clock with a shorter
+  bar, the cost, then the buttons. It then shows the tip only while keeping
+  warm, so nothing wraps in a normal terminal or Zellij pane.
+- **Handoff.** The cold row's "Hand off to a fresh chat" runs the handoff
+  mod. If handoff isn't running, the band says so after 7 s, instead of
+  leaving the request behind.
 
 ### handoff 0.2.0 (2026-10-27)
 

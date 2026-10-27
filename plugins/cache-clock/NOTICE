@@ -1,0 +1,19 @@
+cache-clock
+
+Based on cache-clock 0.3.0, part of the "benai-mods" Claude Code mods collection
+by Ben AI (https://www.benai.co). Redistributed in joel/skill-marketplace with
+the author's permission.
+
+Changes from 0.3.0 (in 0.4.0):
+- The ~/.claude/mods/switches.json switches (from benai's `mods` pane) are
+  gone. The mod is turned off with `/plugin disable cache-clock`; Hide and
+  `/cacheclock hide` apply to the current chat only.
+- The home directory is read from HOME ($.env.get).
+- bin/ttl.py (python3) became hooks/ttl.ts: the cache length is read from the
+  end of the chat's transcript with `tail`, at the path the engine's Stop hook
+  gives.
+- A handoff request the handoff mod does not take within 7 s is removed, and
+  the band says the handoff mod is not running.
+- When its one row would wrap, the band uses three short rows instead.
+- Tests were rewritten to match the changes above.
+Everything else is the upstream code.
