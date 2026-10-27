@@ -16,7 +16,7 @@ description: >-
   own workflow doc. Do not engage for questions or read-only analysis; defer
   to a project-local skill with the same job when one exists.
 metadata:
-  version: "2.6.0"
+  version: "2.7.0"
   origin: "Genericised from a production Rails project's execution-plan skill"
 ---
 
@@ -293,10 +293,11 @@ dependency audits). The project config lists them. A gate violation usually prin
 exact fix; apply it. Never suppress a fresh violation with a config toggle or a
 todo-list entry.
 
-Some tests may only be runnable in CI (for example browser-driven specs when the
-local environment has no browser driver). Treat that class of failure as
-environmental, not a regression, rely on CI for it, and confirm CI green on HEAD
-before merging. If such a surface is central to the change, live-verify it in Step 8.
+Some tests may only run in CI (browser specs without a local driver): treat their
+local failure as environmental, rely on CI and confirm it green on HEAD; live-verify
+such a surface in Step 8 when it is central. A failure that appears only in a full or
+grouped run, and passes when its file runs alone on your branch and on the base
+commit, is order-dependent, not yours: report it with both runs; do not chase it.
 
 ### Step 7: Commit (atomic commits required)
 
@@ -391,18 +392,15 @@ Board update as in Step 3, with the In Review option ID.
 
 ### Step 10b: Wait for and check the automated review (do not skip)
 
-If the project has an automated PR reviewer (a bot such as Codex configured to
-review every PR), **proactively wait for and check its review before declaring the
-work done or handing back**, without being asked. Opening the PR is not the end of
-the loop. The bot's verdict may arrive through different APIs for findings versus a
-clean pass, it re-anchors already-resolved comments on every round, and it is
-sometimes slow or silent. The polling recipe, the dedupe rule, the stop rule, and
-the bounded-wait rule are in
+If the project has an automated PR reviewer (a bot such as Codex), **wait for and
+check its review before declaring the work done**, without being asked. Findings and
+clean verdicts arrive through different channels (reviews, inline comments, an
+edited status comment, a reaction), resolved comments are re-anchored on every round,
+a force-push may not retrigger it, and it is sometimes slow or silent. Paginate every
+list. Expect several rounds: after every fix push, re-trigger once, wait a bounded
+time, re-check, address, until a round is clean or the remainder is deferred to
+tracked issues with threads resolved. Recipes, dedupe and stop rules:
 [automated-review-loop.md](references/automated-review-loop.md).
-
-The review is iterative. Expect several rounds. After every fix push, re-trigger,
-wait, re-check, address. Loop until a round comes back clean, or the remaining items
-are explicitly deferred to tracked issues and their threads resolved.
 
 ### Step 11: Respond to every review comment
 
@@ -416,12 +414,13 @@ thread. Never leave a comment unanswered. For each comment decide one of:
 - **Deferred**: reply acknowledging the concern and naming the issue or PR that will
   address it.
 
-**Before replying "incorrect" or "already fixed", verify it.** Bot findings are
-frequently subtle and correct. For "already fixed", confirm the fix is in the pushed
-code, not just edited locally. For "false positive", reproduce the claim first with a
-30-second probe (a runner script, a focused test, a curl) and quote the evidence in
-the reply. If the probe confirms the finding, fix it. Expect several rounds; a fix
-can introduce a new, sometimes higher-severity, finding.
+**Verify claims against code and data, in both directions.** Bot findings are
+frequently subtle and correct, and a human's counter-claim ("no, that can't happen")
+gets the same check. For "already fixed", confirm the fix is in the pushed code. For
+"false positive", reproduce first with a 30-second probe (a script, a focused test, a
+curl, a read-only count) and quote the evidence; reply with counts and file
+references, never customer or personal data. A reviewer can be wrong on the fact and
+right on the direction: say both. A fix can introduce a new, higher-severity finding.
 
 API recipes for reading, replying, and resolving threads (including the reply
 endpoint that returns 404 without the PR number) are in
@@ -437,7 +436,8 @@ reviews taught. It reports, it never commits to this PR (Step 15).
 
 The objective gate is:
 
-- required CI checks green on HEAD,
+- **every** check on HEAD completed green, not only the required ones (a running or
+  failed optional check is not green), re-verified after any fix push,
 - `mergeStateStatus: CLEAN` and `MERGEABLE`,
 - zero unresolved review threads (every thread fixed or accepted-and-resolved),
 - the latest automated-reviewer verdict is clean, or the remainder is accepted nits
@@ -458,8 +458,8 @@ gh pr merge <PR> --repo <owner>/<repo> --squash
 ```
 
 If the project config says humans merge, or says nothing, **stop at PR-ready**:
-post the closing summary (Step 14) and hand off. Docs-only PRs that sit blocked with no failing
-checks follow the project's docs-PR convention (often an admin merge).
+post the closing summary (Step 14) and hand off. Docs-only PRs that sit blocked with
+no failing checks follow the project's docs-PR convention (often an admin merge).
 
 ### Step 13: Tag and publish a release (optional, after merge)
 

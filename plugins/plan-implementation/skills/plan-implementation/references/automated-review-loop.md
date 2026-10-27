@@ -1,5 +1,8 @@
 # Automated PR reviewer loop
 
+Loaded from the plan-implementation skill (Step 10b) when the PR is open and the
+project names an automated reviewer.
+
 Applies when the project config names an automated reviewer bot (the worked example
 here is OpenAI Codex, `chatgpt-codex-connector[bot]`, which reviews every PR a few
 minutes after it opens and re-reviews on new pushes or on an `@codex review`
@@ -10,28 +13,38 @@ the end of the loop.
 
 ## Where the verdict lives
 
-Findings and a clean pass arrive through **different APIs**:
+Findings and a clean pass arrive through **different channels**, and bots change
+them over time, so check all of them:
 
 - **Findings**: a formal review (`pulls/<PR>/reviews`, `state: COMMENTED`, with a
   `commit_id`) plus inline `pulls/<PR>/comments`. These are what you triage.
-- **A clean round**: a PR **issue comment** (`issues/<PR>/comments`) whose body
-  starts with the bot's clean-verdict text (for Codex: `Codex Review: Didn't find
-  any major issues`). Not a formal review, and without a `commit_id`.
+- **A clean round** may post no review at all. Depending on the bot and how the
+  round was triggered, it shows as a PR **issue comment** with the bot's
+  clean-verdict text, a pinned **status comment that the bot edits** in place
+  (Running → Completed, naming the reviewed sha), or a **reaction** on the PR (for
+  example 👀 while running, +1 when clean).
+
+Worked example, Codex (`chatgpt-codex-connector[bot]`) as of October 2026: the pinned
+"Codex Review Summary" card flips to Completed for the reviewed sha and the bot reacts
++1 on the PR; the "Codex Review: Didn't find any major issues" comment appears only
+after a manual `@codex review`.
 
 Polling only `pulls/<PR>/reviews` misses a clean pass and looks like "the bot never
-responded". Always check both:
+responded". Check every channel, paginated:
 
 ```bash
-gh api repos/<owner>/<repo>/pulls/<PR>/reviews \
+gh api --paginate repos/<owner>/<repo>/pulls/<PR>/reviews \
   --jq '.[] | select(.user.login=="<bot-login>") | {state, submitted_at, commit_id}'
-gh api repos/<owner>/<repo>/pulls/<PR>/comments \
+gh api --paginate repos/<owner>/<repo>/pulls/<PR>/comments \
   --jq '.[] | select(.user.login=="<bot-login>") | {id, path, line, body}'
-gh api repos/<owner>/<repo>/issues/<PR>/comments \
-  --jq '.[] | select(.user.login=="<bot-login>") | {created_at, body: .body[0:80]}'
+gh api --paginate repos/<owner>/<repo>/issues/<PR>/comments \
+  --jq '.[] | select(.user.login=="<bot-login>") | {created_at, updated_at, body: .body[0:120]}'
+gh api repos/<owner>/<repo>/issues/<PR>/reactions \
+  --jq '.[] | select(.user.login=="<bot-login>") | .content'
 ```
 
-For a clean issue comment (no `commit_id`), confirm it is on the latest commit from
-the timeline: its `created_at` is after your last push or trigger comment.
+A clean verdict counts only for the current HEAD: the status comment names the HEAD
+sha, or a clean comment's `created_at` is after your last push or trigger comment.
 
 ## Dedupe re-anchored findings
 
@@ -51,6 +64,9 @@ threads means "all re-anchored, nothing new": safe to merge.
   10–15 minutes, or the auto-trigger never fires. Bake a nudge into the poll: if
   there is no activity about 5 minutes after a push, post one trigger comment and
   keep polling.
+- A **force-push after the first round may not retrigger** the bot (a status card
+  stays Completed on the old sha). Post one trigger comment yourself, then bound the
+  wait.
 - Rapid-fire triggers get coalesced or ignored. Space them out (about 45 seconds
   between checks) and confirm via a review on the current HEAD sha or the trigger's
   reaction, not elapsed time.
@@ -61,7 +77,7 @@ threads means "all re-anchored, nothing new": safe to merge.
 
 After pushing a fix for a finding, do **not** hard-gate the merge on a fresh verdict.
 Re-nudge once, wait a bounded window (about 15 minutes), then merge on the objective
-gate (CI green, `mergeStateStatus: CLEAN`, zero unresolved threads) and record the
+gate (every check green, `mergeStateStatus: CLEAN`, zero unresolved threads) and record the
 call in the merge summary. Bots frequently stay silent after fix pushes, and a poll
 whose success condition requires "CLEAN **and** a fresh verdict" can wait forever on
 an already-clean PR. Make the objective conditions the gate and the verdict a bounded
@@ -74,7 +90,7 @@ delta that touches only CI-ignored paths (`git diff X HEAD --stat` shows only do
 the reviewed code is byte-identical and the prior verdict satisfies the review gate.
 Nudge once; if silent, merge on the objective gate and record the judgment call. Two
 prerequisites: keep a code-touching commit at HEAD (the docs-only-tip rule), and the
-required checks must actually be green on the new sha. A history-rewriting force-push
+checks must actually be green on the new sha. A history-rewriting force-push
 gets CI to run despite path-ignores, because GitHub cannot compute the push diff;
 *appending* a docs-only commit instead is the blocked trap.
 
