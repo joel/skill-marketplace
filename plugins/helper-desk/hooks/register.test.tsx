@@ -24,6 +24,7 @@ function rig(on: On, files: Record<string, string>) {
 
   on('session.start', async ($, e) => ({ cwd: e.cwd }) as never)
   on('session.id', async () => ({ value: 'sess1' }) as never)
+  on('env.get', async ($, e) => ({ value: (e as { name: string }).name === 'HOME' ? '/Users/test' : undefined }) as never)
   on('session.usage', async () => ({ value: { startedAt: 0, context: {}, rateLimits: [], cost: { usd: 0.42 } } }) as never)
   on('command.register', async () => ({ value: undefined }) as never)
   on('tool.register', async ($, e) => {
@@ -302,35 +303,30 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await v.find({ text: /^File read$/ }), 'closed again').toBeUndefined()
   })
 
-  test(`switches.json false: the pane draws nothing of its own (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
-    const files: Record<string, string> = {}
-    const { opened, closed, clock } = rig(on, files)
+  test(`pane: off: no cards, no auto open, and /helpers says how to turn it on (${surface})`, { timeoutMs: 30000, options: { pane: 'off' } }, async ($, on) => {
+    const { opened, clock } = rig(on, {})
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
     await $.agent.spawn({ tool_use_id: 's1', prompt: 'x', description: 'Build the landing page', subagentType: 'general-purpose' } as never)
     await clock.settle()
+    expect(opened, 'no auto open').not.toContain('helpers')
     const v = await $.ui.mount({ plugin: 'helper-desk', surface, component: 'Pane', requestId: 'helpers', props: props() })
-    expect(await v.find({ text: /Build the landing page/ }), 'drawn while on').toBeDefined()
-
-    // The switchboard writes the file; the 3 s poll reads it.
-    files['*/.claude/mods/switches.json'] = JSON.stringify({ 'helper-desk': false })
-    await clock.advance(3_100)
-    expect(closed, 'pane closed').toContain('helpers')
     expect(await v.find({ text: /Build the landing page/ }), 'no card').toBeUndefined()
     expect(await v.find({ text: /helper/i }), 'nothing of its own').toBeUndefined()
     const r = await $.command.run({ command: 'helpers', args: '' } as never)
-    expect(String((r as { text?: string }).text), 'command says off').toContain('Helper Desk is off')
+    expect(String((r as { text?: string }).text), 'command points to /config').toContain('/config')
+    expect(opened, '/helpers opens nothing').not.toContain('helpers')
+  })
 
-    // An open request is used up but opens nothing while off; on again, it opens.
-    const before = opened.length
-    files['*/.claude/mods/.open-helper-desk-sess1'] = ''
-    await clock.advance(3_100)
-    expect(opened.length, 'no open while off').toBe(before)
-    expect('*/.claude/mods/.open-helper-desk-sess1' in files, 'request used up while off').toBe(false)
-    files['*/.claude/mods/switches.json'] = '{}'
-    files['*/.claude/mods/.open-helper-desk-sess1'] = ''
-    await clock.advance(3_100)
-    expect(opened.length, 'open request answered').toBe(before + 1)
-    expect('*/.claude/mods/.open-helper-desk-sess1' in files, 'request file removed').toBe(false)
+  test(`pane: manual: helpers are tracked but the pane opens only on /helpers (${surface})`, { timeoutMs: 30000, options: { pane: 'manual' } }, async ($, on) => {
+    const { opened, clock } = rig(on, {})
+    await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
+    await $.agent.spawn({ tool_use_id: 's1', prompt: 'x', description: 'Build the landing page', subagentType: 'general-purpose' } as never)
+    await clock.settle()
+    expect(opened, 'no auto open').not.toContain('helpers')
+    await $.command.run({ command: 'helpers', args: '' } as never)
+    expect(opened, '/helpers opens it').toContain('helpers')
+    const v = await $.ui.mount({ plugin: 'helper-desk', surface, component: 'Pane', requestId: 'helpers', props: props() })
+    expect(await v.find({ text: /Build the landing page/ }), 'the card draws').toBeDefined()
   })
 
   test(`each card has one thick sparkle bar (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
@@ -350,7 +346,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     }
   })
 
-  test(`Hide in the pane writes the shared flag and closes it (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+  test(`Hide closes the pane for this session, writes no file, and /helpers shows it again (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
     const files: Record<string, string> = {}
     const { opened, closed, clock } = rig(on, files)
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
@@ -359,25 +355,30 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(opened, 'opened by itself').toContain('helpers')
     const v = await $.ui.mount({ plugin: 'helper-desk', surface, component: 'Pane', requestId: 'helpers', props: props() })
     await v.press({ key: 'hide' })
-    const sw = Object.keys(files).find(k => k.endsWith('/.claude/mods/switches.json')) ?? ''
-    expect(JSON.parse(files[sw] ?? '{}'), 'Hide writes the shared flag').toEqual({ 'helper-desk:hidden': true })
     expect(closed, 'the pane closes').toContain('helpers')
+    expect(Object.keys(files).filter(k => k.includes('/.claude/mods/')), 'no switches file').toEqual([])
+
+    // Hidden: a new round of helpers does not open it.
+    await $.turn.complete({ answer: 'ok', agentId: 'agent-a1', reason: 'answer', durationMs: 1, isAborted: false, turnId: 't1' } as never)
+    await clock.settle()
+    const before = opened.length
+    await $.agent.spawn({ tool_use_id: 's2', prompt: 'x', description: 'Write the copy', subagentType: 'general-purpose' } as never)
+    await clock.settle()
+    expect(opened.length, 'no auto open while hidden').toBe(before)
+
+    await $.command.run({ command: 'helpers', args: '' } as never)
+    expect(opened.length, '/helpers opens it').toBe(before + 1)
   })
 
-  test(`hidden, it does not open by itself; cleared, Show opens it (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
-    const files: Record<string, string> = { '*/.claude/mods/switches.json': JSON.stringify({ 'helper-desk:hidden': true }) }
-    const { opened, clock } = rig(on, files)
+  test(`/helpers hide closes the pane and stops it opening by itself (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+    const { opened, closed, clock } = rig(on, {})
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
+    const r = await $.command.run({ command: 'helpers', args: 'hide' } as never)
+    expect(String((r as { text?: string }).text), 'says hidden').toContain('hidden')
+    expect(closed, 'closed').toContain('helpers')
     await $.agent.spawn({ tool_use_id: 's1', prompt: 'x', description: 'Build the landing page', subagentType: 'general-purpose' } as never)
     await clock.settle()
     expect(opened, 'no auto open while hidden').not.toContain('helpers')
-
-    files['*/.claude/mods/switches.json'] = '{}'
-    files['*/.claude/mods/.open-helper-desk-sess1'] = ''
-    await clock.advance(3_100)
-    expect(opened, 'Show opens the pane').toContain('helpers')
-    const v = await $.ui.mount({ plugin: 'helper-desk', surface, component: 'Pane', requestId: 'helpers', props: props() })
-    expect(await v.find({ text: /Build the landing page/ }), 'the card draws').toBeDefined()
   })
 
   test(`the plan tool writes the plan file and draws "2 of 4" (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
@@ -484,26 +485,20 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await bandSays(v, surface), 'new plan shows').toContain('Tasks 0/4')
   })
 
-  test(`off or hidden: the band draws nothing of its own (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+  test(`band: off: the band draws nothing of its own, and the plan still saves (${surface})`, { timeoutMs: 30000, options: { band: 'off' } }, async ($, on) => {
     const files: Record<string, string> = {}
-    const { clock } = rig(on, files)
+    const { clock, toasts } = rig(on, files)
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
     const callTool = $.tool.call as unknown as (input: unknown) => Promise<{ result?: unknown }>
     await callTool({ tool: 'mcp__helper-desk__plan', tool_use_id: 'p1', steps: steps4(1, true) })
-    await clock.settle()
-    const v = await $.ui.mount({ plugin: 'helper-desk', surface, component: 'AbovePrompt', props: bandProps() })
-    expect(await v.find({ key: 'plan-band' }), 'drawn while on').toBeDefined()
-
-    files['*/.claude/mods/switches.json'] = JSON.stringify({ 'helper-desk:hidden': true })
-    await clock.advance(3_100)
-    expect(await v.find({ key: 'plan-band' }), 'hidden: no band').toBeUndefined()
-
-    files['*/.claude/mods/switches.json'] = JSON.stringify({ 'helper-desk': false })
-    await clock.advance(3_100)
-    expect(await v.find({ key: 'plan-band' }), 'off: no band').toBeUndefined()
-    expect(await v.find({ text: /Tasks|steps/ }), 'off: nothing of its own').toBeUndefined()
     const said = await callTool({ tool: 'mcp__helper-desk__plan', tool_use_id: 'p2', steps: steps4(2, true) })
-    expect(String(said.result), 'the tool says it is off').toContain('off')
+    await clock.settle()
+    expect(String(said.result), 'the tool still saves').toContain('Plan saved')
+    expect(files['/Users/test/.claude/mods-state/plan-sess1.json'], 'plan file under HOME').toBeDefined()
+    expect(toasts, 'no step toasts').toEqual([])
+    const v = await $.ui.mount({ plugin: 'helper-desk', surface, component: 'AbovePrompt', props: bandProps() })
+    expect(await v.find({ key: 'plan-band' }), 'no band').toBeUndefined()
+    expect(await v.find({ text: /Tasks|steps/ }), 'nothing of its own').toBeUndefined()
   })
 }
 

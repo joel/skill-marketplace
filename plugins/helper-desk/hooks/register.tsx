@@ -11,14 +11,12 @@ const HELPERS = { plugin: 'helper-desk', key: 'helpers' } as const
 const CLOCK = { plugin: 'helper-desk', key: 'clock' } as const
 const VIEW = { plugin: 'helper-desk', key: 'view' } as const
 const COST = { plugin: 'helper-desk', key: 'cost' } as const
-const OFF = { plugin: 'helper-desk', key: 'off' } as const
 const HIDDEN = { plugin: 'helper-desk', key: 'hidden' } as const
 const PLAN = { plugin: 'helper-desk', key: 'plan' } as const
 const SHIM = { plugin: 'helper-desk', key: 'shimmer' } as const
 
 const TICK_MS = 300
 const POLL_MS = 2000
-const SWITCH_MS = 3000
 const HISTORY = 3
 const MAX_STEPS = 200
 const TAG_W = 11
@@ -141,12 +139,16 @@ let nextHue = 0
 let tickN = 0
 let home = ''
 let sessionId = ''
-let off = false
-// "helper-desk:hidden": true in switches.json closes the pane and stops it opening by itself.
+// The userConfig switches, set by register: /config changes them and reloads the module.
+// `pane`: auto opens by itself when helpers start, manual only on /helpers, off never draws.
+type PaneMode = 'auto' | 'manual' | 'off'
+let paneMode: PaneMode = 'auto'
+let bandOn = true
+const deskOn = () => paneMode !== 'off'
+// Hide or /helpers hide: the pane closes and stops opening by itself, for this session.
 let hidden = false
 let ticker: { cancel: () => void } | null = null
 let poller: { cancel: () => void } | null = null
-let switcher: { cancel: () => void } | null = null
 const strangers = new Set<string>()
 
 function toolWords(tool: string, connector: string) {
@@ -286,6 +288,7 @@ function pickHue() {
 const copy = (hp: Helper): Helper => ({ ...hp, steps: hp.steps.map(st => ({ ...st })) })
 
 async function log($: EngineInterface, line: string) {
+  if (!home) return
   try {
     const dir = `${home}/.claude/mods-logs`
     const path = `${dir}/${NAME}.log`
@@ -338,7 +341,7 @@ async function poll($: EngineInterface) {
 }
 
 function syncTimers($: EngineInterface) {
-  if (working() && !off) {
+  if (working() && deskOn()) {
     ticker ??= $.clock.every(TICK_MS, () => {
       void tick($).catch(() => undefined)
     })
@@ -394,7 +397,7 @@ async function addHelper($: EngineInterface, id: string, description: string, ty
   seats += 1
   await publish($)
   // The pane opens by itself when a new round of helpers starts.
-  if (wasIdle && !hidden) void $.ui.open({ id: PANE, title: TITLE }).catch(err => log($, `open: ${String(err)}`))
+  if (wasIdle && paneMode === 'auto' && !hidden) void $.ui.open({ id: PANE, title: TITLE }).catch(err => log($, `open: ${String(err)}`))
 }
 
 /** A loop whose spawn this mod missed (a reload, a race): take it from $.agent.list(). */
@@ -448,76 +451,15 @@ async function finish($: EngineInterface, id: string, phase: HelperPhase, usage:
   await publish($)
 }
 
-async function setOff($: EngineInterface, value: boolean) {
-  if (value === off) return
-  off = value
-  await $.state.set(OFF, off)
-  if (off) {
-    $.ui.status(undefined)
-    await $.ui.close({ id: PANE }).catch(() => undefined)
-  }
-  syncTimers($)
-  syncShimmer($)
-}
-
-const HIDE_KEY = `${NAME}:hidden`
-const switchesPath = () => `${home}/.claude/mods/switches.json`
-
-async function readSwitches($: EngineInterface): Promise<Record<string, unknown>> {
-  if (!(await $.fs.exists(switchesPath()))) return {}
-  const json = JSON.parse(String(await $.fs.read(switchesPath()))) as unknown
-  return json && typeof json === 'object' && !Array.isArray(json) ? (json as Record<string, unknown>) : {}
-}
-
-async function readSwitch($: EngineInterface) {
-  try {
-    const json = await readSwitches($)
-    const nowHidden = json[`${NAME}:hidden`] === true
-    if (nowHidden && !hidden) await $.ui.close({ id: PANE }).catch(() => undefined)
-    if (nowHidden !== hidden) {
-      hidden = nowHidden
-      // The band reads this key, so a change redraws it.
-      await $.state.set(HIDDEN, hidden)
-      syncShimmer($)
-    }
-    await setOff($, json[NAME] === false)
-  } catch {
-    // A broken file never turns the mod off.
-  }
-}
-
-// Read, change, write the whole file, so every chat sees the choice within 3 s.
+// Session only, kept in $.state so a reload keeps it; /config's pane: off is the lasting choice.
 async function setHidden($: EngineInterface, value: boolean) {
-  try {
-    const json = await readSwitches($)
-    if (value) json[HIDE_KEY] = true
-    else delete json[HIDE_KEY]
-    await $.process.run(['mkdir', '-p', `${home}/.claude/mods`])
-    await $.fs.write(switchesPath(), `${JSON.stringify(json, null, 2)}\n`)
-  } catch (err) {
-    await log($, `save hidden: ${String(err)}`)
-  }
   hidden = value
   await $.state.set(HIDDEN, hidden)
-  syncShimmer($)
   if (value) await $.ui.close({ id: PANE }).catch(() => undefined)
 }
 
 async function openPane($: EngineInterface) {
   await $.ui.open({ id: PANE, title: TITLE })
-}
-
-async function checkOpen($: EngineInterface) {
-  if (!sessionId) return
-  const path = `${home}/.claude/mods/.open-${NAME}-${sessionId}`
-  if (!(await $.fs.exists(path).catch(() => false))) return
-  await $.process.run(['rm', '-f', path])
-  if (!off) await openPane($)
-}
-
-async function switchPoll($: EngineInterface) {
-  await readSwitch($)
-  await checkOpen($).catch(err => log($, `open request: ${String(err)}`))
 }
 
 // ---------- The plan: one list per chat, shared with chat-inventory through a file ----------
@@ -615,7 +557,7 @@ async function drawPlan($: EngineInterface) {
 
 /** The shimmer clock runs only while a shown plan has a step in progress. */
 function syncShimmer($: EngineInterface) {
-  const need = !off && !hidden && planShown && !!plan?.steps.some(st => st.status === 'in_progress')
+  const need = bandOn && planShown && !!plan?.steps.some(st => st.status === 'in_progress')
   if (need) {
     shimmer ??= $.clock.every(SHIMMER_MS, () => {
       shimN += 1
@@ -628,6 +570,8 @@ function syncShimmer($: EngineInterface) {
 }
 
 function say($: EngineInterface, text: string) {
+  // The step toasts belong to the band: band: off keeps them quiet too.
+  if (!bandOn) return
   try {
     $.ui.toast(cut(text, 140))
   } catch {
@@ -935,11 +879,18 @@ ${body}
 </svg>`
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  paneMode = options.pane === 'manual' || options.pane === 'off' ? options.pane : 'auto'
+  bandOn = options.band !== 'off'
+
   on('session.start', async ($, e, next) => {
-    home = $.plugin.root.split('/.claude/')[0] ?? ''
+    home = (await $.env.get('HOME').catch(() => undefined)) ?? ''
     sessionId = await $.session.id().catch(() => '')
-    await $.command.register({ name: 'helpers', description: 'Show the Helper Desk: the task progress bar and one live card per subagent', immediate: true })
+    await $.command.register({
+      name: 'helpers',
+      description: 'Show the Helper Desk pane, one live card per subagent; /helpers hide closes it for this session',
+      immediate: true,
+    })
     await $.tool.register({
       name: 'plan',
       description:
@@ -967,11 +918,9 @@ export const register: Register = on => {
       // In front, not behind ToolSearch: a hidden tool never gets called.
       isDeferred: false,
     }).catch(err => log($, `register plan tool: ${String(err)}`))
-    await readSwitch($)
+    const { value: wasHidden = false } = await $.state.get(HIDDEN)
+    hidden = wasHidden
     await loadPlan($)
-    switcher ??= $.clock.every(SWITCH_MS, () => {
-      void switchPoll($).catch(err => log($, `switch: ${String(err)}`))
-    })
     // A reload keeps the drawn copy: carry on from it.
     if (!helpers.length) {
       const { value } = await $.state.get(HELPERS)
@@ -986,8 +935,12 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('command.run', { command: 'helpers' }, async $ => {
-    if (off) return { text: `${TITLE} is off. Turn it on with /mods.` }
+  on('command.run', { command: 'helpers' }, async ($, e) => {
+    if (!deskOn()) return { text: `${TITLE}'s pane is off. Set pane to auto or manual for helper-desk in /config.` }
+    if (e.args.trim() === 'hide') {
+      await setHidden($, true)
+      return { text: `${TITLE} hidden for this session. Type /helpers to show it.` }
+    }
     if (hidden) await setHidden($, false)
     await openPane($)
     return { text: helpers.length ? `${TITLE} opened.` : `${TITLE} opened. Cards show up when Claude starts a subagent.` }
@@ -996,7 +949,7 @@ export const register: Register = on => {
   on('ui.press', { plugin: NAME, element: 'hide' }, async ($, e) => {
     await setHidden($, true)
     try {
-      $.ui.toast(`${TITLE} hidden. Type /helpers or open /mods to show it.`)
+      $.ui.toast(`${TITLE} hidden for this session. Type /helpers to show it, or set pane to off in /config.`)
     } catch {
       // The toast is only a hint.
     }
@@ -1013,7 +966,6 @@ export const register: Register = on => {
   })
 
   on('ui.press', { plugin: NAME }, async ($, e, next) => {
-    if (off) return next(e)
     if (e.element.startsWith('steps-')) {
       await toggleIn($, 'open', e.element.slice('steps-'.length))
       return { element: e.element }
@@ -1027,7 +979,7 @@ export const register: Register = on => {
 
   on('agent.spawn', async ($, e, next) => {
     const r = await next(e)
-    if (off) return r
+    if (!deskOn()) return r
     const id = (r as { agentId?: string }).agentId
     if (id) {
       void addHelper($, id, e.description || 'Subagent', e.subagentType || 'subagent', shortModel(e.model ?? r.model ?? '')).catch(err =>
@@ -1043,7 +995,6 @@ export const register: Register = on => {
     const args = e as unknown as Record<string, unknown>
     const id = e.agentId
     if (tool === PLAN_TOOL) {
-      if (off) return { result: `${TITLE} is off, so no plan was saved. Carry on without it.` } as never
       if (id) return { result: 'Only the main chat keeps a plan. Carry on with your task.' } as never
       let said = 'Plan not saved: something went wrong. Carry on.'
       try {
@@ -1056,8 +1007,7 @@ export const register: Register = on => {
       staleNudged = false
       return { result: said } as never
     }
-    if (off) return next(e)
-    if (id) {
+    if (id && deskOn()) {
       void noteTool($, id, describe(tool, args)).catch(err => log($, `tool: ${String(err)}`))
       return next(e)
     }
@@ -1085,7 +1035,7 @@ export const register: Register = on => {
   // A short system-prompt section, only while the mod is on.
   on('prompt.compose', async ($, e, next) => {
     const r = await next(e)
-    if (off || e.traits.includes('teammate') || e.traits.includes('bare')) return r
+    if (e.traits.includes('teammate') || e.traits.includes('bare')) return r
     return { sections: [...r.sections, { id: 'helper-desk:plan', text: PLAN_PROMPT, scope: 'session' as const }] }
   })
 
@@ -1093,7 +1043,7 @@ export const register: Register = on => {
   on('turn.step', async function* ($, e, next) {
     const r = yield* next(e)
     const id = e.agentId
-    if (id && !off) {
+    if (id && deskOn()) {
       const effort = e.effort === undefined ? '' : String(e.effort)
       void noteStep($, id, e.model, effort, r.usage ?? null).catch(err => log($, `step: ${String(err)}`))
     }
@@ -1103,7 +1053,7 @@ export const register: Register = on => {
   on('turn.complete', async ($, e, next) => {
     const r = await next(e)
     const id = e.agentId
-    if (id && !off && helpers.some(hp => hp.id === id)) {
+    if (id && deskOn() && helpers.some(hp => hp.id === id)) {
       const failed = e.reason === 'error' || e.reason === 'refusal' || e.isAborted
       void finish($, id, failed ? 'failed' : 'done', e.usage ?? null).catch(err => log($, `turn: ${String(err)}`))
     }
@@ -1111,8 +1061,7 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
-    const { value: isOff = false } = await $.state.get(OFF)
-    if (isOff || off) return next(e)
+    if (!deskOn()) return next(e)
     const els = $.ui.resolve(e)
     const { Box, Text, Button } = els
     // Svg draws on desktop, the editor and mobile; the terminal gets a glyph.
@@ -1334,11 +1283,9 @@ export const register: Register = on => {
 
   // The task bar above the prompt: it moves each time a to-do or plan step is marked done.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (off || e.props.hasSurvey) return next(e)
-    const { value: isOff = false } = await $.state.get(OFF)
-    const { value: isHidden = false } = await $.state.get(HIDDEN)
+    if (!bandOn || e.props.hasSurvey) return next(e)
     const { value: p = null } = await $.state.get(PLAN)
-    if (isOff || isHidden || hidden || !p || !p.shown || !p.steps.length) return next(e)
+    if (!p || !p.shown || !p.steps.length) return next(e)
     // The other mods' bands draw above this one. Claude Code's own placeholder is never nested.
     const drawn = await Promise.resolve(next(e)).catch(() => null)
     const rest = drawn && typeof drawn === 'object' && (drawn as { type?: string }).type !== 'engine' ? drawn : null

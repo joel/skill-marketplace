@@ -61,9 +61,7 @@ declare module 'claude-code' {
       view: { open: string[]; folded: string[] }
       /** The chat's /cost total in US dollars, null where the host keeps none. */
       cost: { usd: number | null }
-      /** True while switches.json turns the mod off. */
-      off: boolean
-      /** True while switches.json hides the band and the pane ("helper-desk:hidden"). */
+      /** True once Hide or /helpers hide closed the pane for this session. */
       hidden: boolean
       /** The plan the band draws; null before the first plan. */
       plan: BandPlan | null
