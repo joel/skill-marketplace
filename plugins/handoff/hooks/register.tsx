@@ -1,12 +1,14 @@
-import type { EngineInterface, Register, SessionMessage } from 'claude-code'
+import type { EngineInterface, Register, RenderSurface, SessionMessage } from 'claude-code'
 
 import type { Panel, Step } from '../types'
 
 // One key for the whole band: offer, steps, buttons.
 const PANEL = { plugin: 'handoff', key: 'panel' } as const
+const HIDDEN = { plugin: 'handoff', key: 'hidden' } as const
 
-// The Refresh offer opens at this many tokens. Closing a finished handoff moves it up by SNOOZE.
-// Chats auto-compact near 300k to 324k, so the offer must open well before that.
+// The Refresh offer opens at this many tokens (userConfig offer_at). Closing a finished
+// handoff moves it up by SNOOZE. Chats auto-compact near 300k to 324k on a 200k-class
+// window, so the default must open well before that.
 const OFFER_AT = 250_000
 const SNOOZE = 100_000
 const POLL_MS = 5000
@@ -33,11 +35,14 @@ const LABELS = [
 // Module variables reset on a reload; the band itself lives in $.state.
 let sid = ''
 let home = ''
-let petDir = ''
+let inZellij = false
 let busy = false
 // The model asked for a refresh in the middle of its turn: it starts when the turn ends,
 // because a fork while a tool call is open would send a tool use with no result.
 let pending = false
+// The userConfig switches, set by register: /config changes them and reloads the module.
+let offerOn = true
+let offerAt = OFFER_AT
 let snoozedTo = OFFER_AT
 let handoffText = ''
 let handoffPath = ''
@@ -47,46 +52,11 @@ let writeMs = 0
 let running = -1
 let stepStartedAt = 0
 
-// The /mods switchboard turns this mod off in every chat with switches.json.
-// "handoff:hidden": true in the same file stops the automatic Refresh offer in every chat.
-// Show (/refresh, or /mods leaving .open-handoff-<sessionId>) brings the offer up now.
-const NAME = 'handoff'
-const HIDE_KEY = `${NAME}:hidden`
-let off = false
+// Hide on the offer stops it popping up in this chat; /refresh shows it again. Kept in
+// $.state so a reload keeps it. A lasting "no" is offer: off in /config.
 let hidden = false
-// The offer was asked for (Show or /refresh): it stays whatever the token count.
+// The offer was asked for (/refresh): it stays whatever the token count.
 let forced = false
-
-const switchesPath = ($: EngineInterface) => `${$.plugin.root.split('/.claude/')[0] ?? ''}/.claude/mods/switches.json`
-
-async function readSwitches($: EngineInterface): Promise<Record<string, unknown>> {
-  const path = switchesPath($)
-  if (!(await $.fs.exists(path))) return {}
-  const json = JSON.parse(String(await $.fs.read(path))) as unknown
-  return json && typeof json === 'object' && !Array.isArray(json) ? (json as Record<string, unknown>) : {}
-}
-
-async function readSwitch($: EngineInterface) {
-  let nowOff = off
-  let nowHidden = hidden
-  try {
-    const json = await readSwitches($)
-    nowOff = json[NAME] === false
-    nowHidden = json[HIDE_KEY] === true
-  } catch {
-    // A broken or missing file changes nothing.
-  }
-  if (nowOff === off && nowHidden === hidden) return
-  off = nowOff
-  const hiding = nowHidden && !hidden
-  hidden = nowHidden
-  if (hiding) await dropOffer($)
-  try {
-    $.ui.invalidate('ui.render')
-  } catch {
-    // The next state change redraws anyway.
-  }
-}
 
 // Hidden: an offer on screen goes; the steps and a finished handoff stay.
 async function dropOffer($: EngineInterface) {
@@ -95,18 +65,9 @@ async function dropOffer($: EngineInterface) {
   if (p?.phase === 'offer') await setPanel($, null)
 }
 
-// Read, change, write the whole file, so every chat sees the choice within 3 s.
 async function setHidden($: EngineInterface, value: boolean) {
-  try {
-    const json = await readSwitches($)
-    if (value) json[HIDE_KEY] = true
-    else delete json[HIDE_KEY]
-    await $.process.run(['mkdir', '-p', `${home}/.claude/mods`])
-    await $.fs.write(switchesPath($), `${JSON.stringify(json, null, 2)}\n`)
-  } catch (err) {
-    await log($, `save hidden failed: ${String(err)}`)
-  }
   hidden = value
+  await $.state.set(HIDDEN, hidden)
   if (value) await dropOffer($)
 }
 
@@ -118,20 +79,6 @@ async function showOffer($: EngineInterface) {
   const { context } = await $.session.usage()
   forced = true
   await setPanel($, { phase: 'offer', tokens: context.tokens ?? 0, steps: freshSteps(), tick: 0, file: '', words: 0, error: '', note: '' })
-}
-
-// The /mods switchboard asks for the offer by leaving an empty file for this chat.
-async function checkOpen($: EngineInterface) {
-  if (!sid) return
-  const path = `${home}/.claude/mods/.open-${NAME}-${sid}`
-  if (!(await $.fs.exists(path).catch(() => false))) return
-  await $.process.run(['rm', '-f', path])
-  if (!off) await showOffer($)
-}
-
-async function poll($: EngineInterface) {
-  await readSwitch($)
-  await checkOpen($).catch(err => log($, `open request failed: ${String(err)}`))
 }
 
 const short = (tokens: number) => `${Math.round(tokens / 1000)}k`
@@ -449,53 +396,59 @@ async function note($: EngineInterface, text: string) {
   if (p) await setPanel($, { ...p, note: text })
 }
 
-async function copy($: EngineInterface) {
+/** Puts the handoff on the clipboard of the surface that asked; false when nothing was copied. */
+async function copyText($: EngineInterface, surface: RenderSurface) {
+  if (!handoffText) return false
+  const r = await $.ui.copy({ text: handoffText, surface }).catch(() => null)
+  return !!r?.isCopied
+}
+
+async function copy($: EngineInterface, surface: RenderSurface) {
   if (!handoffText) return
-  const r = await $.process.run(['pbcopy'], { stdin: handoffText })
-  await note($, r.exitCode === 0 ? 'Copied. Paste it into a new chat with ⌘V.' : 'Copy failed. Use Open file instead.')
+  await note($, (await copyText($, surface)) ? 'Copied. Paste it into a new chat.' : 'Copy failed. Use Open file instead.')
 }
 
-async function petAlive($: EngineInterface) {
-  try {
-    const j = JSON.parse(String(await $.fs.read(`${petDir}/pet.json`))) as { at?: number }
-    return (await $.clock.now()) - (j.at ?? 0) < 10_000
-  } catch {
-    return false
-  }
-}
+// The fresh chat's first prompt: a lead line, so the text never starts with "#".
+const firstPrompt = () => `Continue from this handoff of an earlier chat:\n\n${handoffText}`
 
-// Claude Pet starts the chat in the app (Bypass, its Send button) and stays on it.
-// Without the pet, the app's own link fills a new chat and you press Return.
-async function startNew($: EngineInterface) {
+// The desktop app fills a new chat from its own link. In Zellij a pane beside this one runs
+// a fresh `claude` on the handoff. A plain terminal gets the handoff copied and a command.
+async function startNew($: EngineInterface, surface: RenderSurface) {
   if (!handoffText) return
   const cwd = await $.session.cwd()
-  if (await petAlive($)) {
-    await note($, 'Starting the new chat…')
-    const id = `handoff-${await $.clock.now()}`
-    await $.fs.write(
-      `${petDir}/requests/${id}.json`,
-      JSON.stringify({ id, at: await $.clock.now(), action: 'newchat', text: handoffText, folder: cwd, stay: true }),
-    )
-    const done = `${petDir}/requests/${id}.done`
-    for (let k = 0; k < 120; k += 1) {
-      await $.clock.sleep(500)
-      if (await $.fs.exists(done)) {
-        const answer = String(await $.fs.read(done)).trim()
-        await $.process.run(['rm', '-f', done])
-        await note($, answer)
-        return
-      }
-    }
-    await note($, 'Claude Pet did not answer. Use Copy handoff prompt instead.')
+  if (surface !== 'terminal') {
+    const url = `claude://code/new?q=${encodeURIComponent(handoffText)}`
+    const r = await $.process.run(['open', url])
+    await note($, r.exitCode === 0 ? 'A new chat is filled in with the handoff. Press Return there to start it.' : 'The new chat did not open. Use Copy handoff prompt instead.')
     return
   }
-  const url = `claude://code/new?q=${encodeURIComponent(handoffText)}`
-  const r = await $.process.run(['open', url])
-  await note($, r.exitCode === 0 ? 'A new chat is filled in with the handoff. Press Return there to start it.' : 'The new chat did not open. Use Copy handoff prompt instead.')
+  if (inZellij) {
+    // A child-session marker from this process would turn off transcript saving there.
+    const argv = ['zellij', 'run', '--name', 'Handoff', '--cwd', cwd, '--', 'env', '-u', 'CLAUDE_CODE_CHILD_SESSION', 'claude', firstPrompt()]
+    const r = await $.process.run(argv).catch(() => null)
+    if (r?.exitCode === 0) {
+      await log($, `started a new chat in zellij pane ${r.stdout.trim()}`)
+      await note($, 'Started a new chat with the handoff in the Zellij pane beside this one.')
+    } else {
+      await log($, `zellij run failed: ${r ? r.stderr.trim().slice(0, 200) : 'no result'}`)
+      await note($, 'Zellij could not open a pane. Use Copy handoff prompt instead.')
+    }
+    return
+  }
+  const run = `claude "$(cat ${handoffPath ? tilde(handoffPath) : '<handoff file>'})"`
+  await note($, (await copyText($, surface)) ? `Copied. Or in a new terminal run: ${run}` : `In a new terminal run: ${run}`)
+}
+
+// Zellij opens the file in the person's $EDITOR in a floating pane; elsewhere the Mac opens it.
+async function openFile($: EngineInterface, surface: RenderSurface) {
+  if (!handoffPath) return
+  const argv = surface === 'terminal' && inZellij ? ['zellij', 'edit', '--floating', handoffPath] : ['open', handoffPath]
+  const r = await $.process.run(argv).catch(() => null)
+  if (r?.exitCode !== 0) await note($, `Could not open it. The file is ${tilde(handoffPath)}.`)
 }
 
 async function checkOffer($: EngineInterface) {
-  if (busy || off) return
+  if (busy) return
   // Cache Clock (another mod) asks for a handoff by leaving this file.
   const request = `${home}/.claude/handoffs/.request-${sid}`
   if (sid && (await $.fs.exists(request).catch(() => false))) {
@@ -509,15 +462,15 @@ async function checkOffer($: EngineInterface) {
   // An offer asked for by Show stays until it is answered.
   if (forced && p) return
   forced = false
-  if (hidden) {
+  if (hidden || !offerOn) {
     if (p) await setPanel($, null)
     return
   }
   const { context } = await $.session.usage()
   const tokens = context.tokens ?? 0
   // A compaction or /clear brings the count down: the offer starts over.
-  if (tokens < OFFER_AT && snoozedTo > OFFER_AT) {
-    snoozedTo = OFFER_AT
+  if (tokens < offerAt && snoozedTo > offerAt) {
+    snoozedTo = offerAt
     if (sid) await $.store.set(`snooze:${sid}`, snoozedTo)
   }
   if (tokens >= snoozedTo) {
@@ -532,10 +485,10 @@ async function checkOffer($: EngineInterface) {
 async function close($: EngineInterface) {
   const p = await getPanel($)
   if (p?.phase === 'offer') {
-    // Hide on the offer: it stops popping up in every chat until Show or /refresh.
+    // Hide on the offer: it stops popping up in this chat until /refresh.
     await setHidden($, true)
     try {
-      $.ui.toast('Refresh offer hidden. Type /refresh or open /mods to show it.')
+      $.ui.toast('Refresh offer hidden for this chat. Type /refresh to show it, or set offer to off in /config.')
     } catch {
       // The toast is only a hint.
     }
@@ -553,15 +506,17 @@ function bar(progress: number, status: Step['status']) {
   return { on: '━'.repeat(filled), off: '━'.repeat(BAR - filled), color }
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  offerOn = options.offer !== 'off'
+  offerAt = typeof options.offer_at === 'number' && options.offer_at > 0 ? options.offer_at : OFFER_AT
+  snoozedTo = offerAt
+
   on('session.start', async ($, e, next) => {
     sid = await $.session.id()
-    home = $.plugin.root.split('/.claude/')[0] ?? ''
-    petDir = `${home}/.claude/pet`
-    await poll($).catch(() => undefined)
-    $.clock.every(3000, () => {
-      void poll($).catch(() => undefined)
-    })
+    home = (await $.env.get('HOME').catch(() => undefined)) ?? ''
+    inZellij = !!(await $.env.get('ZELLIJ').catch(() => undefined))
+    const { value: wasHidden = false } = await $.state.get(HIDDEN)
+    hidden = wasHidden
     await $.command.register({ name: 'handoff', description: 'Write a handoff of this chat now, then copy it or start a new chat with it' })
     try {
       await $.command.register({ name: 'refresh', description: 'Show the Refresh panel now, to move this work to a fresh chat', immediate: true })
@@ -575,7 +530,7 @@ export const register: Register = on => {
       inputSchema: { type: 'object', properties: {} },
     })
     const saved = await $.store.get(`snooze:${sid}`)
-    if (typeof saved === 'number') snoozedTo = saved
+    if (typeof saved === 'number') snoozedTo = Math.max(saved, offerAt)
     try {
       const last = (await $.store.get(`last:${sid}`)) as { path?: string } | undefined
       if (last?.path && (await $.fs.exists(last.path))) {
@@ -596,7 +551,6 @@ export const register: Register = on => {
   })
 
   on('turn.complete', async ($, e, next) => {
-    if (off) return next(e)
     const result = await next(e)
     if (pending) {
       pending = false
@@ -608,14 +562,12 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'refresh' }, async $ => {
-    if (off) return { text: 'Handoff (Refresh) is off. Turn it on with /mods.' }
     await setHidden($, false)
     await showOffer($)
-    return { text: 'Refresh panel shown above the prompt. Press Hide on it, or use /mods, to hide it again.' }
+    return { text: 'Refresh panel shown above the prompt. Press Hide on it to hide it again.' }
   })
 
   on('command.run', { command: 'handoff' }, async $ => {
-    if (off) return { text: 'Handoff (Refresh) is off. Turn it on with /mods.' }
     void run($).catch(() => undefined)
     return { text: 'Writing the handoff. Watch the panel above the prompt.' }
   })
@@ -623,11 +575,8 @@ export const register: Register = on => {
   // One unfiltered hook: a typed tool matcher makes tsc recurse through the connector types.
   on('tool.call', async ($, e, next) => {
     if ((e.tool as string) !== 'mcp__handoff__refresh') return next(e)
-    if (!off) pending = true
-    const said = off
-      ? 'Handoff (Refresh) is off. Tell the user to turn it on with /mods.'
-      : 'The Refresh panel opens above the prompt when this turn ends. Tell the user in one short line, then end your turn.'
-    return { result: said } as never
+    pending = true
+    return { result: 'The Refresh panel opens above the prompt when this turn ends. Tell the user in one short line, then end your turn.' } as never
   }).catch(($, e, next) => next(e))
 
   // Presses go to these hooks, not to onPress: a closure lives one drawing, and the
@@ -641,15 +590,15 @@ export const register: Register = on => {
     return { element: e.element }
   })
   on('ui.press', { plugin: 'handoff', element: 'copy' }, async ($, e) => {
-    await copy($)
+    await copy($, e.surface)
     return { element: e.element }
   })
   on('ui.press', { plugin: 'handoff', element: 'start' }, async ($, e) => {
-    void startNew($).catch(() => undefined)
+    void startNew($, e.surface).catch(() => undefined)
     return { element: e.element }
   })
   on('ui.press', { plugin: 'handoff', element: 'open' }, async ($, e) => {
-    if (handoffPath) await $.process.run(['open', handoffPath])
+    await openFile($, e.surface)
     return { element: e.element }
   })
   on('ui.press', { plugin: 'handoff', element: 'close' }, async ($, e) => {
@@ -658,7 +607,6 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (off) return next(e)
     const p = await getPanel($)
     if (!p || e.props.hasSurvey) return next(e)
     // The offer waits out a running turn; the steps and the result do not.

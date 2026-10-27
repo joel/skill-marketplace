@@ -26,6 +26,10 @@ export type Panel = {
 
 declare module 'claude-code' {
   interface PluginState {
-    handoff: { panel: Panel | null }
+    handoff: {
+      panel: Panel | null
+      /** True once Hide on the offer stopped it for this chat; /refresh clears it. */
+      hidden: boolean
+    }
   }
 }

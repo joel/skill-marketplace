@@ -8,6 +8,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     const files: Record<string, string> = {}
     const store: Record<string, unknown> = {}
     const runs: { argv: readonly string[]; stdin?: string }[] = []
+    const copies: { text: string; surface: string }[] = []
     let forkPrompt = ''
 
     on('session.start', async ($, e) => ({ cwd: e.cwd }) as never)
@@ -15,6 +16,11 @@ for (const surface of ['desktop', 'terminal'] as const) {
     on('tool.register', async () => ({ value: { tool: 'mcp__handoff__refresh' } }) as never)
     const clock = mock.clock(on, { now: 1_000_000 })
     on('session.id', async () => ({ value: 'sid' }) as never)
+    on('env.get', async ($, e) => ({ value: (e as { name: string }).name === 'HOME' ? '/Users/test' : undefined }) as never)
+    on('ui.copy', async ($, e) => {
+      copies.push(e as { text: string; surface: string })
+      return { value: { isCopied: true } } as never
+    })
     on('session.cwd', async () => ({ value: '/Users/test/vault' }) as never)
     on('session.usage', async () => ({ value: { context: { tokens, window: 1_000_000 } } }) as never)
     on('session.messages', async () =>
@@ -46,12 +52,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
       files[path] = text
       return { value: undefined } as never
     })
-    on('fs.read', async ($, e) => {
-      const p = (e as { path: string }).path
-      if (p.endsWith('/pet.json')) return { value: JSON.stringify({ at: clock.now() }) } as never
-      if (p.endsWith('.done')) return { value: 'Started a new chat.' } as never
-      return { value: files[p] ?? '' } as never
-    })
+    on('fs.read', async ($, e) => ({ value: files[(e as { path: string }).path] ?? '' }) as never)
     on('process.run', async ($, e) => {
       const { argv, init } = e as { argv: readonly string[]; init?: { stdin?: string } }
       runs.push({ argv, stdin: init?.stdin })
@@ -91,29 +92,34 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await v.find({ key: 'copy' }), 'ready: copy button').toBeDefined()
     expect(await v.find({ key: 'start' }), 'ready: start button').toBeDefined()
 
-    const saved = Object.entries(files).find(([k]) => k.includes('/.claude/handoffs/') && k.endsWith('.md') && !k.endsWith('-draft.md'))
+    const saved = Object.entries(files).find(([k]) => k.startsWith('/Users/test/.claude/handoffs/') && k.endsWith('.md') && !k.endsWith('-draft.md'))
     const logged = Object.entries(files).find(([k]) => k.endsWith('/handoff.log'))
     expect(logged?.[1] ?? '', 'the run is logged').toContain(' ok ')
     expect(Object.keys(files).some(k => k.endsWith('-draft.md')), 'a draft was saved before the model step').toBe(true)
     expect(saved?.[0] ?? '', 'saved under ~/.claude/handoffs with the title slug').toContain('build-the-refresh-mod.md')
     expect(saved?.[1] ?? '', 'secret removed').not.toContain('sk-abcdefghij')
-    expect(forkPrompt, 'fork prompt lists the read file').toContain('/Users/test/vault/a.md')
+    expect(forkPrompt, 'fork prompt lists the read file, under ~').toContain('~/vault/a.md')
     expect(forkPrompt, 'fork prompt lists the skill').toContain('/plugin-authoring')
     expect(forkPrompt, 'fork prompt lists the link').toContain('https://claude.ai/artifact/abc')
     expect(forkPrompt, 'tmp paths dropped').not.toContain('/tmp/x')
 
     await v.press({ key: 'copy' })
-    const copied = runs.find(r => r.argv[0] === 'pbcopy')
-    expect(copied?.stdin ?? '', 'copy sends the handoff to pbcopy').toContain('# Handoff: Build the refresh mod')
+    expect(copies[0]?.text ?? '', 'copy goes through the surface clipboard').toContain('# Handoff: Build the refresh mod')
+    expect(copies[0]?.surface, 'on the surface that pressed').toBe(surface)
+    expect(runs.some(r => r.argv[0] === 'pbcopy'), 'no pbcopy').toBe(false)
 
     await v.press({ key: 'start' })
     await clock.advance(2_000)
-    const req = Object.entries(files).find(([k]) => k.includes('/.claude/pet/requests/'))
-    const body = JSON.parse(req?.[1] ?? '{}') as { action?: string; stay?: boolean; folder?: string; text?: string }
-    expect(body.action, 'pet request is a new chat').toBe('newchat')
-    expect(body.stay, 'pet stays on the new chat').toBe(true)
-    expect(body.folder).toBe('/Users/test/vault')
-    expect(body.text ?? '').toContain('# Handoff:')
+    v = await $.ui.mount({ plugin: 'handoff', surface, component: 'AbovePrompt', props })
+    if (surface === 'desktop') {
+      const opened = runs.find(r => r.argv[0] === 'open')?.argv[1] ?? ''
+      expect(opened.startsWith('claude://code/new?q='), 'the app fills a new chat').toBe(true)
+    } else {
+      // A plain terminal, not Zellij: copied, with the command to run.
+      expect(copies.length, 'copied again').toBe(2)
+      expect(await v.find({ text: /claude "\$\(cat ~\/\.claude\/handoffs\// }), 'the command to run').toBeDefined()
+    }
+    expect(Object.keys(files).some(k => k.includes('/.claude/pet/')), 'no Claude Pet request').toBe(false)
 
     await v.press({ key: 'close' })
     v = await $.ui.mount({ plugin: 'handoff', surface, component: 'AbovePrompt', props })
@@ -131,6 +137,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     on('tool.register', async () => ({ value: { tool: 'mcp__handoff__refresh' } }) as never)
     const clock = mock.clock(on, { now: 1_000_000 })
     on('session.id', async () => ({ value: 'sid' }) as never)
+    on('env.get', async ($, e) => ({ value: (e as { name: string }).name === 'HOME' ? '/Users/test' : undefined }) as never)
     on('session.cwd', async () => ({ value: '/Users/test/vault' }) as never)
     on('session.usage', async () => ({ value: { context: { tokens: 90_000, window: 1_000_000 } } }) as never)
     on('session.messages', async () => ({ value: [{ role: 'user', text: 'Write the newsletter', toolUses: [] }] }) as never)
@@ -156,7 +163,6 @@ for (const surface of ['desktop', 'terminal'] as const) {
       const { Text } = $.ui.resolve(e)
       return <Text>REST</Text>
     })
-    // The plugin's root decides the home folder.
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
     await clock.advance(20_000)
     const props = { isWorking: false, hasSurvey: false } as never
@@ -172,73 +178,43 @@ for (const surface of ['desktop', 'terminal'] as const) {
   })
 }
 
-for (const surface of ['desktop', 'terminal'] as const) {
-  test(`draws nothing of its own when switched off in /mods (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
-    let switches = ''
-    const isSwitches = (e: unknown) => (e as { path: string }).path.endsWith('/.claude/mods/switches.json')
-    on('session.start', async ($, e) => ({ cwd: e.cwd }) as never)
-    on('command.register', async () => ({ value: undefined }) as never)
-    on('tool.register', async () => ({ value: { tool: 'mcp__handoff__refresh' } }) as never)
-    const clock = mock.clock(on, { now: 1_000_000 })
-    on('session.id', async () => ({ value: 'sid' }) as never)
-    on('session.usage', async () => ({ value: { context: { tokens: 260_000, window: 1_000_000 } } }) as never)
-    on('fs.exists', async ($, e) => ({ value: isSwitches(e) && switches !== '' }) as never)
-    on('fs.read', async ($, e) => ({ value: isSwitches(e) ? switches : '' }) as never)
-    on('fs.write', async () => ({ value: undefined }) as never)
-    on('process.run', async () => ({ value: { exitCode: 0, stdout: '', stderr: '' } }) as never)
-    on('store.get', async () => ({ value: undefined }) as never)
-    on('store.set', async () => ({ value: undefined }) as never)
-    on('turn.complete', async () => ({ text: '' }) as never)
-    on('ui.render', { component: 'AbovePrompt' }, async ($, e) => {
-      const { Text } = $.ui.resolve(e)
-      return <Text>REST</Text>
-    })
-    const props = { isWorking: false, hasSurvey: false } as never
-    await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
-    await clock.settle()
-    let v = await $.ui.mount({ plugin: 'handoff', surface, component: 'AbovePrompt', props })
-    expect(await v.find({ key: 'refresh' }), 'offer shows while on').toBeDefined()
-
-    switches = JSON.stringify({ handoff: false })
-    await clock.advance(3100)
-    v = await $.ui.mount({ plugin: 'handoff', surface, component: 'AbovePrompt', props })
-    expect(await v.find({ key: 'refresh' }), 'no band when off').toBeUndefined()
-    expect(await v.find({ text: 'REST' }), 'other bands still draw').toBeDefined()
-    // Typed loosely: tsc runs out of memory resolving $.tool.call's overloads over every tool.
-    const tools = $.tool as unknown as { call: (input: Record<string, unknown>) => Promise<unknown> }
-    const said = await tools.call({ tool: 'mcp__handoff__refresh' })
-    expect(JSON.stringify(said), 'the tool says it is off').toContain('/mods')
-  })
-}
-
 /** The `on` a test body is handed. */
 type On = Parameters<NonNullable<Parameters<typeof test>[2]>>[1]
 
-const SW = '/.claude/mods/switches.json'
-const OPEN = '/.claude/mods/.open-handoff-sid'
-
-/** Mocks every $ call the offer makes; `files` stands in for the disk, keyed by path end. */
-function rig(on: On, files: Record<string, string>, tokens: { value: number }) {
+/** Mocks every $ call the offer and the buttons make; `files` stands in for the disk, `env` adds variables beside HOME. */
+function rig(on: On, files: Record<string, string>, tokens: { value: number }, env: Record<string, string> = {}) {
   const toasts: string[] = []
-  const keyOf = (path: string) => Object.keys(files).find(k => path.endsWith(k))
+  const runs: string[][] = []
+  const copies: string[] = []
   on('session.start', async ($, e) => ({ cwd: e.cwd }) as never)
   on('command.register', async () => ({ value: undefined }) as never)
   on('tool.register', async () => ({ value: { tool: 'mcp__handoff__refresh' } }) as never)
   const clock = mock.clock(on, { now: 1_000_000 })
   on('session.id', async () => ({ value: 'sid' }) as never)
+  on('env.get', async ($, e) => {
+    const { name } = e as { name: string }
+    return { value: name === 'HOME' ? '/Users/test' : env[name] } as never
+  })
+  on('session.cwd', async () => ({ value: '/Users/test/vault' }) as never)
   on('session.usage', async () => ({ value: { context: { tokens: tokens.value, window: 1_000_000 } } }) as never)
-  on('fs.exists', async ($, e) => ({ value: keyOf((e as { path: string }).path) !== undefined }) as never)
-  on('fs.read', async ($, e) => ({ value: files[keyOf((e as { path: string }).path) ?? ''] ?? '' }) as never)
+  on('session.messages', async () => ({ value: [{ role: 'user', text: 'Write the newsletter', toolUses: [] }] }) as never)
+  on('model.fork', async () => ({ value: { isAnswered: true, text: HANDOFF, usage: {} } }) as never)
+  on('fs.exists', async ($, e) => ({ value: (e as { path: string }).path in files }) as never)
+  on('fs.read', async ($, e) => ({ value: files[(e as { path: string }).path] ?? '' }) as never)
   on('fs.write', async ($, e) => {
     const { path, text } = e as { path: string; text: string }
-    files[path.endsWith(SW) ? SW : path] = text
+    files[path] = text
     return { value: undefined } as never
   })
   on('process.run', async ($, e) => {
-    const { argv } = e as { argv: readonly string[] }
-    const hit = argv[0] === 'rm' ? keyOf(argv[argv.length - 1] ?? '') : undefined
-    if (hit) delete files[hit]
-    return { value: { exitCode: 0, stdout: '', stderr: '' } } as never
+    const { argv } = e as { argv: string[] }
+    runs.push(argv)
+    if (argv[0] === 'rm') for (const path of argv.slice(1)) delete files[path]
+    return { value: { exitCode: 0, stdout: argv[0] === 'zellij' ? 'terminal_9\n' : '', stderr: '' } } as never
+  })
+  on('ui.copy', async ($, e) => {
+    copies.push((e as { text: string }).text)
+    return { value: { isCopied: true } } as never
   })
   on('store.get', async () => ({ value: undefined }) as never)
   on('store.set', async () => ({ value: undefined }) as never)
@@ -251,14 +227,15 @@ function rig(on: On, files: Record<string, string>, tokens: { value: number }) {
     const { Text } = $.ui.resolve(e)
     return <Text>REST</Text>
   })
-  return { clock, toasts }
+  return { clock, toasts, runs, copies }
 }
 
 const offerProps = { isWorking: false, hasSurvey: false } as never
 const begin = { source: 'startup', cwd: '/Users/test/vault', isInteractive: true } as const
+const ZELLIJ = { ZELLIJ: '0' }
 
 for (const surface of ['desktop', 'terminal'] as const) {
-  test(`Hide on the offer writes the shared flag and it stays away (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+  test(`Hide on the offer keeps it away in this chat and writes no file (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
     const files: Record<string, string> = {}
     const tokens = { value: 262_000 }
     const { clock, toasts } = rig(on, files, tokens)
@@ -268,7 +245,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await v.find({ key: 'refresh' }), 'offer at 262k').toBeDefined()
 
     await v.press({ key: 'close' })
-    expect(JSON.parse(files[SW] ?? '{}'), 'Hide writes the shared flag').toEqual({ 'handoff:hidden': true })
+    expect(Object.keys(files).filter(k => k.includes('/.claude/mods/')), 'no switches file').toEqual([])
     expect(toasts.join(' '), 'the toast names the way back').toContain('/refresh')
     v = await $.ui.mount({ plugin: 'handoff', surface, component: 'AbovePrompt', props: offerProps })
     expect(await v.find({ key: 'refresh' }), 'offer gone').toBeUndefined()
@@ -280,45 +257,73 @@ for (const surface of ['desktop', 'terminal'] as const) {
     v = await $.ui.mount({ plugin: 'handoff', surface, component: 'AbovePrompt', props: offerProps })
     expect(await v.find({ key: 'refresh' }), 'still hidden').toBeUndefined()
     expect(await v.find({ text: 'REST' }), 'other bands still draw').toBeDefined()
-  })
-}
 
-for (const surface of ['desktop', 'terminal'] as const) {
-  test(`clearing the flag brings the offer back; Show and /refresh open it at any size (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
-    const files: Record<string, string> = { [SW]: JSON.stringify({ 'handoff:hidden': true }) }
-    const tokens = { value: 262_000 }
-    const { clock } = rig(on, files, tokens)
-    await $.session.start({ ...begin, surface } as never)
-    await clock.settle()
-    let v = await $.ui.mount({ plugin: 'handoff', surface, component: 'AbovePrompt', props: offerProps })
-    expect(await v.find({ key: 'refresh' }), 'no offer while hidden').toBeUndefined()
-
-    // /mods clears the flag: the next check draws the offer again.
-    files[SW] = '{}'
-    await clock.advance(5100)
-    v = await $.ui.mount({ plugin: 'handoff', surface, component: 'AbovePrompt', props: offerProps })
-    expect(await v.find({ key: 'refresh' }), 'offer back').toBeDefined()
-
-    // Hide it, then a small chat: the Show request still brings it up now.
-    await v.press({ key: 'close' })
+    // /refresh clears the hide and shows it now, at any size.
     tokens.value = 40_000
-    files[SW] = '{}'
-    files[OPEN] = ''
-    await clock.advance(3100)
-    v = await $.ui.mount({ plugin: 'handoff', surface, component: 'AbovePrompt', props: offerProps })
-    expect(await v.find({ key: 'refresh' }), 'Show opens it at 40k').toBeDefined()
-    expect(files[OPEN], 'the request file is used up').toBeUndefined()
-    // It stays through the 5 s check, though the count is under 250k.
-    await clock.advance(10_000)
-    v = await $.ui.mount({ plugin: 'handoff', surface, component: 'AbovePrompt', props: offerProps })
-    expect(await v.find({ key: 'refresh' }), 'a shown offer stays').toBeDefined()
-
-    // Hide, then /refresh clears the flag and shows it again.
-    await v.press({ key: 'close' })
     const said = JSON.stringify(await $.command.run({ command: 'refresh', args: '' } as never))
     expect(said, '/refresh reply').toContain('Refresh panel shown')
-    expect(JSON.parse(files[SW] ?? '{}'), '/refresh clears the flag').toEqual({})
     v = await $.ui.mount({ plugin: 'handoff', surface, component: 'AbovePrompt', props: offerProps })
     expect(await v.find({ key: 'refresh' }), '/refresh shows the panel').toBeDefined()
+    await clock.advance(10_000)
+    v = await $.ui.mount({ plugin: 'handoff', surface, component: 'AbovePrompt', props: offerProps })
+    expect(await v.find({ key: 'refresh' }), 'a shown offer stays under the threshold').toBeDefined()
   })
 }
+
+test('offer: off never offers by itself, but /refresh and the tool still work', { timeoutMs: 30000, options: { offer: 'off' } }, async ($, on) => {
+  const tokens = { value: 400_000 }
+  const { clock } = rig(on, {}, tokens)
+  await $.session.start({ ...begin, surface: 'terminal' } as never)
+  await $.turn.complete({ answer: '' } as never)
+  await clock.advance(10_000)
+  let v = await $.ui.mount({ plugin: 'handoff', surface: 'terminal', component: 'AbovePrompt', props: offerProps })
+  expect(await v.find({ key: 'refresh' }), 'no offer at 400k').toBeUndefined()
+  await $.command.run({ command: 'refresh', args: '' } as never)
+  v = await $.ui.mount({ plugin: 'handoff', surface: 'terminal', component: 'AbovePrompt', props: offerProps })
+  expect(await v.find({ key: 'refresh' }), '/refresh still shows it').toBeDefined()
+  // Typed loosely: tsc runs out of memory resolving $.tool.call's overloads over every tool.
+  const tools = $.tool as unknown as { call: (input: Record<string, unknown>) => Promise<unknown> }
+  const said = JSON.stringify(await tools.call({ tool: 'mcp__handoff__refresh' }))
+  expect(said, 'the tool answers').toContain('opens above the prompt')
+})
+
+test('offer_at moves the threshold', { timeoutMs: 30000, options: { offer_at: 100_000 } }, async ($, on) => {
+  const tokens = { value: 90_000 }
+  const { clock } = rig(on, {}, tokens)
+  await $.session.start({ ...begin, surface: 'terminal' } as never)
+  await clock.settle()
+  let v = await $.ui.mount({ plugin: 'handoff', surface: 'terminal', component: 'AbovePrompt', props: offerProps })
+  expect(await v.find({ key: 'refresh' }), 'none at 90k').toBeUndefined()
+  tokens.value = 110_000
+  await $.turn.complete({ answer: '' } as never)
+  await clock.settle()
+  v = await $.ui.mount({ plugin: 'handoff', surface: 'terminal', component: 'AbovePrompt', props: offerProps })
+  expect(await v.find({ key: 'refresh' }), 'offered at 110k').toBeDefined()
+})
+
+test('in Zellij, Start new chat opens a pane beside this one running claude on the handoff', { timeoutMs: 30000 }, async ($, on) => {
+  const files: Record<string, string> = {}
+  const { clock, runs, copies } = rig(on, files, { value: 10_000 }, ZELLIJ)
+  await $.session.start({ ...begin, surface: 'terminal' } as never)
+  await $.command.run({ command: 'handoff', args: '' } as never)
+  await clock.advance(10_000)
+  let v = await $.ui.mount({ plugin: 'handoff', surface: 'terminal', component: 'AbovePrompt', props: offerProps })
+  expect(await v.find({ key: 'start' }), 'ready').toBeDefined()
+
+  await v.press({ key: 'start' })
+  const argv = runs.find(a => a[0] === 'zellij' && a[1] === 'run') ?? []
+  expect(argv.slice(0, 6), 'a named pane in the chat folder').toEqual(['zellij', 'run', '--name', 'Handoff', '--cwd', '/Users/test/vault'])
+  expect(argv.includes('--floating'), 'beside, not floating').toBe(false)
+  expect(argv.slice(6, 11), 'claude without the child-session marker').toEqual(['--', 'env', '-u', 'CLAUDE_CODE_CHILD_SESSION', 'claude'])
+  const prompt = argv[11] ?? ''
+  expect(prompt.startsWith('#'), 'the first prompt never starts with #').toBe(false)
+  expect(prompt, 'the handoff is the first prompt').toContain('# Handoff: Build the refresh mod')
+  expect(copies, 'nothing copied').toEqual([])
+  v = await $.ui.mount({ plugin: 'handoff', surface: 'terminal', component: 'AbovePrompt', props: offerProps })
+  expect(await v.find({ text: /Zellij pane beside this one/ }), 'the note says where').toBeDefined()
+
+  await v.press({ key: 'open' })
+  const edit = runs.find(a => a[0] === 'zellij' && a[1] === 'edit') ?? []
+  expect(edit.slice(0, 3), 'Open file floats an editor').toEqual(['zellij', 'edit', '--floating'])
+  expect(edit[3]?.startsWith('/Users/test/.claude/handoffs/'), 'the saved handoff').toBe(true)
+})
