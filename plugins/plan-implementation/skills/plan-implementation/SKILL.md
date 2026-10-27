@@ -16,7 +16,7 @@ description: >-
   own workflow doc. Do not engage for questions or read-only analysis; defer
   to a project-local skill with the same job when one exists.
 metadata:
-  version: "2.0.0"
+  version: "2.1.0"
   origin: "Genericised from a production Rails project's execution-plan skill"
 ---
 
@@ -83,9 +83,10 @@ governance here (issues, board, reviewer bot, releases). Invoke the agents inste
   skip the design agents. Go straight to issue → branch → commit.
 - **Already designed this session** (a plan-mode pass or equivalent exploration plus
   a user-approved plan grounded in real code): do not re-run the explorer and
-  architect agents. Feed the existing findings into the issue. This exemption does
-  **not** waive the passes with their own mandates: the customer-facing UI pass, the
-  UX pass, and the pre-mortem still apply when the work triggers them. "Already
+  architect agents, and say so in the announce marker. Feed the existing findings
+  into the issue. This exemption does **not** waive the passes with their own
+  mandates: the customer-facing UI pass, the UX pass, and the pre-mortem still apply
+  when the work triggers them. "Already
   covered" means the prior plan shows the pass itself, with its checklist walked,
   not merely that design decisions were made. When in doubt, run the pass. It takes
   minutes and the misses it catches otherwise cost review rounds.
@@ -112,6 +113,22 @@ governance here (issues, board, reviewer bot, releases). Invoke the agents inste
      approach with the user.
   7. Feed the chosen blueprint, including UI and UX decisions and any accepted
      limitation from the pre-mortem, into the issue plan and the implementation.
+
+## Sub-agents: keep the main context for reasoning
+
+A run that reads the whole area and every test run in the main context compacts
+before the PR opens, and each compaction throws away what was read. Delegate the reads
+and runs whose output is mostly noise; keep what the main agent must reason about.
+
+| Step | Delegate to | It returns |
+|---|---|---|
+| Orientation, before Step 5 and after every compaction | one `Explore` agent | a one-page brief: entry points, files to change, conventions, the snippets that matter |
+| Design pass | `feature-dev:code-explorer` / `code-architect` | findings and a blueprint; read the snippets they quote, not the files behind them |
+| Validation, Step 6 and per commit in Step 7 | one `general-purpose` agent | failures only, with ten lines of context; "clean" otherwise |
+| A local tooling gap blocking the run | one `general-purpose` agent in its own worktree | root cause and the PR that fixes it |
+
+**Stays in the main agent:** implementing, commit messages, the PR body, review
+replies and triage. Briefs and what to ask back: [sub-agents.md](references/sub-agents.md).
 
 ## Workflow steps
 
@@ -176,6 +193,9 @@ dependency-direction linter, a type checker on part of the tree), place code in 
 owning module and cross boundaries only through the declared public surface. **Never
 weaken enforcement to make a change pass.** If a boundary genuinely blocks a
 legitimate change, the boundary is what should change, deliberately.
+
+Unless the change is trivial, work from the orientation brief (Sub-agents above).
+After a compaction, relaunch it for the files the next step edits; do not re-read the area.
 
 ### Step 5b: Seed data (mandatory for any new user-facing surface)
 
@@ -246,7 +266,8 @@ purely cosmetic UI diffs. Same triage and stop rule as Step 5c.
 
 Run the project's lint, test, and system-test tasks and make sure they pass. Use the
 commands from the project config; confirm task names against the project's task
-runner rather than assuming.
+runner rather than assuming. Run them through the validation agent (Sub-agents
+above), which returns failures only; fix in the main agent and re-run the same way.
 
 **Run every merge-blocking gate explicitly.** Projects often have CI checks that the
 default test task does not run (boundary checkers, type checkers, schema drift,
@@ -267,7 +288,8 @@ before merging. If such a surface is central to the change, live-verify it in St
   edit UI" are three commits, not one).
 - **Focused**: only files related to that change.
 - **Reversible**: revertable independently without breaking other changes.
-- **Buildable**: passes lint and tests on its own.
+- **Buildable**: passes lint and tests on its own (the validation agent checks each
+  commit of a stack).
 
 Stage specific files, not `git add .`, and write a descriptive message with a body.
 Include the attribution trailer your harness instructs.
@@ -475,6 +497,7 @@ write it down now.
 2.  gh project item-add                         → Add to board (Backlog)
 3.  gh project item-edit                        → In Progress
 4.  git checkout -b feature/                    → Branch
+4b. Explore agent (skip if trivial)             → Orientation brief; again after every compaction
 5.  implement the blueprint                     → Respect module boundaries; never weaken enforcement
 5b. extend seeds (+ run seeds twice)            → Showcase-ready demo data
 5c. /code-review (loop; mind the stop rule)     → Internal CR, combined pre-push gate with 5d
