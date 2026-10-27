@@ -16,7 +16,7 @@ description: >-
   own workflow doc. Do not engage for questions or read-only analysis; defer
   to a project-local skill with the same job when one exists.
 metadata:
-  version: "2.7.0"
+  version: "2.8.0"
   origin: "Genericised from a production Rails project's execution-plan skill"
 ---
 
@@ -320,13 +320,13 @@ working tree has your fix, and the old version ships. After committing, check
 you did, check the pushed code with `git show origin/<branch>:<path>`, not your
 working tree.
 
-**Pre-commit hooks.** If a hook is a false positive, skip only that hook and say why
-in the commit body (`SKIP=<hook> git commit ...` or the framework's equivalent).
-Never disable the whole hook framework.
+**Pre-commit hooks.** Skip only a false-positive hook and say why in the commit body
+(`SKIP=<hook>` or the framework's equivalent); never disable the whole framework.
+A subject-only message starting with `#<issue>` is stripped by git's default comment
+character and rejected as empty: add a body, or use `git -c core.commentChar=";"`.
 
-A subject-only message starting with `#<issue>` can be stripped to nothing by git's
-default comment character and rejected as empty. Add a body, or use
-`git -c core.commentChar=";"`.
+**Performance work is one measured change per commit**: a baseline commit first, then
+before → after medians in each body; a change inside the noise is reverted, not kept.
 
 **`[skip ci]` markers.** Check the project config before adding one. Where CI already
 path-ignores docs, none is needed; where a squash merge folds commit bodies into the
@@ -335,14 +335,14 @@ silently skip a production deploy.
 
 ### Step 8: Live verification (runtime test)
 
-After committing and before pushing, verify the change running in the real app, with
-the project's product-review or verify skill if it has one. Otherwise start the app
-from the worktree, sign in with the dev login recipe, and drive every changed journey
-end to end in a real browser: every state, both themes, a mobile viewport, and DOM
-assertions for what a screenshot cannot show. Fix what breaks into the relevant
-commit and re-run the tests. **Auth, cookie or session changes also verify the wire**
-with `curl`, not just the screen. Procedure and checks:
-[live-verify.md](references/live-verify.md).
+After committing and before pushing, verify the change in the real app, with the
+project's product-review or verify skill if it has one. Otherwise run the pre-flight
+(background worker running, your own account, never the developer's, no test run in
+flight), start the app from the worktree, sign in, and drive every changed journey end
+to end in a real browser: every state, both themes, a mobile viewport, DOM assertions
+for what a screenshot cannot show. Fix what breaks into the relevant commit and re-run
+the tests. **Auth, cookie or session changes also verify the wire** with `curl`.
+Procedure and checks: [live-verify.md](references/live-verify.md).
 
 ### Step 8b: Documentation and diagrams (mandatory for cross-cutting work)
 

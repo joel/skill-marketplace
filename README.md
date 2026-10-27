@@ -67,6 +67,17 @@ forbids an entry without a directory.
 
 ## Release notes
 
+### plan-implementation 2.8.0 (2026-10-27)
+
+Live-verification pre-flight and performance measurements. Before the first
+browser step the agent checks that background work (job worker, queue
+consumer, mail catcher) is running, signs in with its own account rather than
+the developer's, and avoids running tests that share a datastore with the dev
+app. Server errors are reproduced through the real server. Performance work is
+one measured change per commit, with a baseline first, before → after medians,
+no overlapping measurements, and changes inside the noise reverted. Details in
+`references/live-verify.md`.
+
 ### plan-implementation 2.7.0 (2026-10-27)
 
 Review loop and merge gate. Every list call is paginated, and the
