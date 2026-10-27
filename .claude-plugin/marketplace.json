@@ -28,7 +28,7 @@
         "name": "Joel Azemar"
       },
       "category": "workflow",
-      "version": "2.4.0",
+      "version": "2.5.0",
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/joel/skill-marketplace.git",

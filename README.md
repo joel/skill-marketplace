@@ -67,6 +67,18 @@ forbids an entry without a directory.
 
 ## Release notes
 
+### plan-implementation 2.5.0 (2026-10-27)
+
+One worktree per effort. Step 4 creates the branch in its own worktree
+(`git worktree add ../<repo>-wt-<slug> -b <branch> origin/main`) after
+checking for an existing one, and never switches, stashes or resets the
+shared checkout, where another session's uncommitted work may live. A new
+`Worktree setup` project-config key names the gitignored files to copy and the
+install command. Review rounds that land later are fixed in the PR's worktree;
+the worktree is removed after merge; Step 13 no longer checks out `main`. The
+live-verification procedure and the release commands move to
+`references/live-verify.md` and `references/release.md`.
+
 ### plan-implementation 2.4.0 (2026-10-27)
 
 QA notes and a closing summary. Before merging or handing off, the agent
