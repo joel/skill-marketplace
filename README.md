@@ -13,6 +13,7 @@ Marketplace name: `joel-skills`. Catalog: `.claude-plugin/marketplace.json`.
 | `plan-implementation` | Drives any piece of code work through a full lifecycle: size-scaled design pass, GitHub issue, Kanban, branch, implement, seed data, internal code and security review loops, validation gates, atomic commits, live verification in a real browser, docs and diagrams, PR, automated-reviewer loop, review-thread triage, merge per project policy, optional release, and persisting what was learned. Generic: each project supplies its own repo, board, commands, gates, reviewer bot, and merge policy through its workflow doc. |
 | `prompt-debias` | Rewrites a draft prompt before you send it so the answering model cannot silently inherit your frames. Models refute what you assert but inherit what you assume. The skill inventories every injected frame, keeps real constraints and evidence, quarantines the rest as hypotheses to test, states the question neutrally, and adds instructions that force competing framings and odds-backed conclusions. Returns the rewritten prompt plus a table of what changed. Inspired by [Techintrospect's AI Bullshit Fixer](https://techintrospect.substack.com/p/ai-bullshit-fixer-prompt). |
 | `joel-tone` | Rewrites drafts, emails, Slack messages, proposals, or LLM-generated copy into Joel's voice so they read like a careful human wrote them. Picks the register first (public Vogon Partners copy or Joel's own messages), then applies the hard rules: no em or en dashes, no invented facts, no empty intensifiers, no filled-template rhythm. Ships the public-website voice brief as a reference. Returns paste-ready text plus a short note on what changed and what to check. |
+| `helper-desk` | A Claude Code mod (a hooks module, not a skill) by [Ben AI](https://www.benai.co), redistributed with permission. A purple task bar above the prompt fills as Claude ticks off its plan, and the Helper Desk pane shows one live card per subagent: its current step, tokens, time and a progress bar. Registers a `plan` tool and `/helpers`, and adds a short system-prompt section plus plan nudges to every session while it is enabled. Built and tested on Claude Code 2.1.311 (upstream 0.4.0 needed 2.1.287 or newer). See [helper-desk 0.5.0](#helper-desk-050-2026-10-27). |
 
 ## Installation (one-time, per machine)
 
@@ -66,6 +67,31 @@ allowed), and it is the only PR that bumps the version. A rename cannot land on
 forbids an entry without a directory.
 
 ## Release notes
+
+### helper-desk 0.5.0 (2026-10-27)
+
+First release here, based on Ben AI's helper-desk 0.4.0 (its `NOTICE` lists
+what changed).
+
+- **Switches are Claude Code's own.** Turn it off with
+  `/plugin disable helper-desk`. In `/config`, `band` (`on`/`off`) shows or
+  hides the task bar and `pane` (`auto`/`manual`/`off`) sets whether the pane
+  opens when subagents start, only on `/helpers`, or never. The pane's Hide
+  button and `/helpers hide` close it for the current session. Ben's
+  `~/.claude/mods/switches.json` is no longer read.
+- **Home from `HOME`.** Logs (`~/.claude/mods-logs/helper-desk.log`) and the
+  plan file (`~/.claude/mods-state/plan-<session>.json`, which Ben's
+  chat-inventory reads) now land in the home directory under `--plugin-dir`
+  too, not inside the checkout.
+- **Zellij.** In a terminal it draws text glyphs and truecolor, never
+  images, so nothing depends on graphics passthrough. Checked in Zellij
+  0.45.1, which gets Claude Code's fullscreen layout (tmux gets the main
+  screen): at 160 columns the pane docks beside the transcript (from 110
+  columns when asked for, 144 when it opens by itself); at 80 columns
+  `/helpers` places it inline above the prompt. Zellij's default normal
+  mode keeps `Ctrl o`, `Ctrl t`, `Ctrl s`, `Ctrl p` and its other mode keys for
+  itself, so press `Ctrl g` (locked mode) first when Claude Code needs them;
+  `ctrl+x` is not bound by Zellij.
 
 ### plan-implementation 2.8.0 (2026-10-27)
 
@@ -296,10 +322,11 @@ plugins/
   <plugin-name>/
     .claude-plugin/plugin.json      ← plugin manifest
     skills/<skill-name>/SKILL.md    ← the skill itself
-    hooks/hooks.json                ← optional Claude Code hooks (scripts next to it, called via ${CLAUDE_PLUGIN_ROOT})
+    hooks/hooks.json                ← optional Claude Code hooks (scripts next to it, called via ${CLAUDE_PLUGIN_ROOT}),
+                                      or a mod's hooks module: { "modules": ["./register.tsx"] } (tests: *.test.tsx)
     tests/                          ← optional unittest suite, run by scripts/check.sh
 templates/plugin/                   ← copy this to start a new plugin
-scripts/check.sh                    ← validates manifests + version consistency
+scripts/check.sh                    ← validates manifests + version consistency, runs plugin tests
 ```
 
 ## Links

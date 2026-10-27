@@ -1,0 +1,16 @@
+helper-desk
+
+Based on helper-desk 0.4.0, part of the "benai-mods" Claude Code mods
+collection by Ben AI (https://www.benai.co). Redistributed in
+joel/skill-marketplace with the author's permission.
+
+Changes from 0.4.0 (in 0.5.0):
+- The ~/.claude/mods/switches.json switches (from benai's `mods` pane) are
+  gone. The mod is turned off with `/plugin disable helper-desk`. Two
+  userConfig pickers, shown in /config, set the display: band on|off and
+  pane auto|manual|off.
+- Hide and the new `/helpers hide` close the pane for the current session only.
+- The home directory is read from HOME ($.env.get), not derived from the
+  plugin's install path.
+- Tests were updated to match the changes above.
+Everything else is the upstream code.

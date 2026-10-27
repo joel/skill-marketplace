@@ -1,0 +1,28 @@
+{
+  "name": "helper-desk",
+  "version": "0.5.0",
+  "description": "Helper Desk: a purple task progress bar above the prompt that moves as each to-do item is done, and a side pane with one live card per subagent",
+  "author": {
+    "name": "Ben AI",
+    "url": "https://www.benai.co"
+  },
+  "repository": "https://github.com/joel/skill-marketplace",
+  "keywords": ["mod", "progress", "subagents", "pane"],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "band": {
+      "type": "string",
+      "title": "Task bar",
+      "description": "The purple task bar above the prompt: on or off",
+      "default": "on",
+      "options": ["on", "off"]
+    },
+    "pane": {
+      "type": "string",
+      "title": "Helper Desk pane",
+      "description": "auto opens it when subagents start, manual only on /helpers, off never draws it",
+      "default": "auto",
+      "options": ["auto", "manual", "off"]
+    }
+  }
+}
