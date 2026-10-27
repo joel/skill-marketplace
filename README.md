@@ -16,6 +16,7 @@ Marketplace name: `joel-skills`. Catalog: `.claude-plugin/marketplace.json`.
 | `helper-desk` | A Claude Code mod (a hooks module, not a skill) by [Ben AI](https://www.benai.co), redistributed with permission. A purple task bar above the prompt fills as Claude ticks off its plan, and the Helper Desk pane shows one live card per subagent: its current step, tokens, time and a progress bar. Registers a `plan` tool and `/helpers`, and adds a short system-prompt section plus plan nudges to every session while it is enabled. Built and tested on Claude Code 2.1.311 (upstream 0.4.0 needed 2.1.287 or newer). See [helper-desk 0.5.0](#helper-desk-050-2026-10-27). |
 | `handoff` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. When a chat reaches 250k tokens (configurable), a Refresh row offers to move the work to a fresh chat. It writes a handoff of the whole chat (what was asked, decided and done, files to open, next steps) with one model call, saves a draft first, and keeps every handoff in `~/.claude/handoffs/`. Then it copies the handoff, or starts the new chat: in a Zellij pane beside this one, or in the desktop app. `/refresh` shows the row, `/handoff` writes one now. Pairs with cache-clock's "Hand off" button. See [handoff 0.2.0](#handoff-020-2026-10-27). |
 | `cache-clock` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. Counts down above the prompt until the chat's prompt cache goes cold (5 min or 1 hour, read from the chat's transcript), so you know when a reply is still cheap. Keep warm (`/keepwarm`) sends a tiny background ping before the cache expires. When a big chat goes cold, "Hand off to a fresh chat" runs the handoff mod, so install both. Fits narrow terminals and Zellij panes. See [cache-clock 0.4.0](#cache-clock-040-2026-10-27). |
+| `effort-optimizer` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. Before Claude starts on a prompt, one short model call reads it and picks the effort level it needs (low to max) with Ben's four-question framework. In `suggest` mode a question offers the switch; in `auto` mode it switches by itself. The level goes on this chat's requests only, never into your own effort setting, and the footer shows it (`Effort Low`). Settings in `/config`; `/effort-optimizer` shows the real level. See [effort-optimizer 0.2.0](#effort-optimizer-020-2026-10-27). |
 
 ## Installation (one-time, per machine)
 
@@ -69,6 +70,35 @@ allowed), and it is the only PR that bumps the version. A rename cannot land on
 forbids an entry without a directory.
 
 ## Release notes
+
+### effort-optimizer 0.2.0 (2026-10-27)
+
+First release here, based on Ben AI's effort-optimizer 0.1.0 (its `NOTICE`
+lists what changed). Ben's four-question framework is unchanged.
+
+- **Cost.** Each prompt you type (not slash commands) costs one short model
+  call at low effort: Sonnet 5.5 by default, or Haiku 5.5 with
+  `picker_model` in `/config`.
+- **Your own effort setting is never touched.** Claude Code keeps it in
+  `~/.claude/settings.json` (`effortLevel`), shared by every chat. The mod
+  instead puts its pick on this chat's requests. The terminal's own indicator
+  above the prompt keeps showing your setting, so the real level is in the
+  footer (`Effort High`) and in `/effort-optimizer`. If you change your effort
+  with `/effort`, the mod lets go.
+- **No cache cost.** Checked live: the request after a switch from low to
+  high read the whole chat from cache (56k read, 67 written), so switching
+  levels does not re-cache the chat.
+- **Settings in `/config`.** `mode` (`suggest` or `auto`) and
+  `picker_model`. `/effort-optimizer auto|suggest` and the dialog's "Switch,
+  and auto-adjust from now" write the mode there. `/effort-optimizer off|on`
+  pauses it in the current chat only, and `/plugin disable effort-optimizer`
+  turns it off. Upstream's stored mode and on/off are no longer read.
+- **Terminal.** The suggest question is Claude Code's own dialog. The "Effort
+  set to …" line and its Learn more panel fit the width (lines cut, the button
+  on its own row when needed), with wording about the terminal's indicator and
+  `/effort` instead of the desktop app's menu.
+- **helper-desk.** Each pick is shared in
+  `~/.claude/mods-state/effort-<session>.json`, for helper-desk to show.
 
 ### helper-desk 0.6.1 (2026-10-27)
 

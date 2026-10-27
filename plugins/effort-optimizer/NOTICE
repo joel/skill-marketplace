@@ -2,4 +2,22 @@ effort-optimizer
 
 Based on effort-optimizer 0.1.0, the "benai-effort-optimizer" Claude Code mod by
 Ben AI (https://www.benai.co). Redistributed in joel/skill-marketplace with the
-author's permission. Changes from 0.1.0 are listed below as they are made.
+author's permission.
+
+Changes from 0.1.0 (in 0.2.0):
+- The person's own effort setting is never written: every pick goes on the
+  chat's requests for this session only (the turn.step rewrite upstream used
+  as its fallback).
+- The ~/.claude/mods/switches.json switch (benai's `mods` pane) is gone. The
+  mod is turned off with `/plugin disable effort-optimizer`;
+  `/effort-optimizer off|on` pauses it in the current chat only.
+- Mode (suggest|auto) and the picker model live in userConfig, shown in
+  /config; the commands and the dialog write the mode there.
+- The home directory is read from HOME ($.env.get).
+- The terminal gets its own Learn more wording and glyph, and band rows that
+  fit its width.
+- Each pick is shared in ~/.claude/mods-state/effort-<session>.json for
+  helper-desk.
+- The pure decisions moved to hooks/level.ts; tests were added (upstream had
+  none).
+Ben's four-question framework and its prompt are unchanged.
