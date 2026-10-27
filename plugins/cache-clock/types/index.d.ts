@@ -36,6 +36,11 @@ export type Warm = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'cache-clock': { clock: Clock | null; warm: Warm | null }
+    'cache-clock': {
+      clock: Clock | null
+      warm: Warm | null
+      /** True once Hide or /cacheclock hide hid the clock in this chat. */
+      hidden: boolean
+    }
   }
 }

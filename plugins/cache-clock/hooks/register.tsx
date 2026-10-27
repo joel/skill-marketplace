@@ -1,9 +1,11 @@
 import type { EngineInterface, ModelForkResult, Register } from 'claude-code'
 
 import type { Clock, Warm } from '../types'
+import { TAIL_BYTES, ttlFromTail } from './ttl'
 
 const CLOCK = { plugin: 'cache-clock', key: 'clock' } as const
 const WARM = { plugin: 'cache-clock', key: 'warm' } as const
+const HIDDEN = { plugin: 'cache-clock', key: 'hidden' } as const
 
 const FIVE_MIN = 5 * 60_000
 const ONE_HOUR = 60 * 60_000
@@ -11,6 +13,11 @@ const DEMO_MS = 60_000
 // A cold chat this big gets the handoff button: re-reading it costs the most.
 const BIG = 150_000
 const BAR = 20
+// Narrower than this, the band splits its one row into three, so nothing wraps.
+const WIDE = 120
+const MIN_BAR = 8
+// The handoff mod takes a request within 5 s; one still there after this means it is not running.
+const HANDOFF_WAIT_MS = 7_000
 
 // Keep warm: one small background ping about 45 s before the cache would go cold.
 // $.model.fork repeats the main thread's last request (same model, system prompt,
@@ -39,39 +46,11 @@ let detected: 'unknown' | '5m' | '1h' = 'unknown'
 let working = false
 let pinging = false
 
-// The /mods switchboard turns this mod off in every chat with switches.json.
-// "cache-clock:hidden": true in the same file hides the clock in every chat.
-const NAME = 'cache-clock'
-const HIDE_KEY = `${NAME}:hidden`
-let off = false
+// Hide (its button or /cacheclock hide) hides the clock in this chat; /cacheclock shows it.
+// Kept in $.state so a reload keeps it. A lasting "off" is /plugin disable cache-clock.
 let hidden = false
-
-const switchesPath = ($: EngineInterface) => `${$.plugin.root.split('/.claude/')[0] ?? ''}/.claude/mods/switches.json`
-
-async function readSwitches($: EngineInterface): Promise<Record<string, unknown>> {
-  const path = switchesPath($)
-  if (!(await $.fs.exists(path))) return {}
-  const json = JSON.parse(String(await $.fs.read(path))) as unknown
-  return json && typeof json === 'object' && !Array.isArray(json) ? (json as Record<string, unknown>) : {}
-}
-
-async function readSwitch($: EngineInterface) {
-  let nowOff = off
-  let nowHidden = hidden
-  try {
-    const json = await readSwitches($)
-    nowOff = json[NAME] === false
-    nowHidden = json[HIDE_KEY] === true
-  } catch {
-    // A broken or missing file changes nothing.
-  }
-  if (nowOff === off && nowHidden === hidden) return
-  off = nowOff
-  hidden = nowHidden
-  if (off) await stopWarm($, 'Keep warm stopped: Cache Clock was turned off in /mods.')
-  else if (hidden) await stopWarm($, 'Keep warm stopped: Cache Clock is hidden.')
-  await redraw($)
-}
+// The chat's transcript, from the engine's Stop hook, else found once under ~/.claude/projects.
+let transcriptPath = ''
 
 async function redraw($: EngineInterface) {
   try {
@@ -83,18 +62,9 @@ async function redraw($: EngineInterface) {
   }
 }
 
-// Read, change, write the whole file, so every chat sees the choice within 3 s.
 async function setHidden($: EngineInterface, value: boolean) {
-  try {
-    const json = await readSwitches($)
-    if (value) json[HIDE_KEY] = true
-    else delete json[HIDE_KEY]
-    await $.process.run(['mkdir', '-p', `${home}/.claude/mods`])
-    await $.fs.write(switchesPath($), `${JSON.stringify(json, null, 2)}\n`)
-  } catch (err) {
-    await log($, `save hidden failed: ${String(err)}`)
-  }
   hidden = value
+  await $.state.set(HIDDEN, hidden)
   if (value) await stopWarm($, 'Keep warm stopped: Cache Clock is hidden.')
   await redraw($)
 }
@@ -114,6 +84,13 @@ function lengthLabel(c: Clock) {
   if (c.ttlSource === 'demo') return '60 s demo cache, this chat only'
   if (c.ttlSource === 'detected') return `${c.ttlMs === ONE_HOUR ? '1 hour' : '5 min'} cache, as Anthropic's last reply set it`
   return '5 min cache, a guess until the first reply'
+}
+
+/** The length label in a few words, for a narrow band. */
+function shortLabel(c: Clock) {
+  if (c.ttlSource === 'demo') return '60 s demo'
+  if (c.ttlSource === 'detected') return c.ttlMs === ONE_HOUR ? '1 h cache' : '5 min cache'
+  return '5 min cache (a guess)'
 }
 
 function ttl(): { ttlMs: number; ttlSource: Clock['ttlSource'] } {
@@ -177,7 +154,6 @@ async function stopWarm($: EngineInterface, why: string, shout = true) {
 async function warmTick($: EngineInterface) {
   const w = await getWarm($)
   if (!w || pinging || working) return
-  if (off) return stopWarm($, 'Keep warm stopped: Cache Clock was turned off in /mods.')
   const now = await $.clock.now()
   if (now - w.startedAt >= MAX_MS) return stopWarm($, 'Keep warm stopped after 2 hours. Type /keepwarm to start it again.')
   if (w.pings >= MAX_PINGS) return stopWarm($, `Keep warm stopped after ${MAX_PINGS} pings. Type /keepwarm to start it again.`)
@@ -243,6 +219,7 @@ function warmLine(w: Warm, left: number): string {
 }
 
 async function log($: EngineInterface, line: string) {
+  if (!home) return
   try {
     const path = `${home}/.claude/mods-logs/cache-clock.log`
     const old = (await $.fs.exists(path)) ? String(await $.fs.read(path)) : ''
@@ -254,13 +231,30 @@ async function log($: EngineInterface, line: string) {
   }
 }
 
+/** This chat's transcript: the path the engine gave, else ~/.claude/projects/<any>/<sid>.jsonl. */
+async function findTranscript($: EngineInterface) {
+  if (transcriptPath || !home || !sid) return transcriptPath
+  const root = `${home}/.claude/projects`
+  for (const d of await $.fs.list(root).catch(() => [])) {
+    if (d.kind !== 'dir') continue
+    const path = `${root}/${d.name}/${sid}.jsonl`
+    if (await $.fs.exists(path).catch(() => false)) {
+      // The Stop hook's path, should it land during the scan, wins.
+      transcriptPath ||= path
+      break
+    }
+  }
+  return transcriptPath
+}
+
 // Reads which cache length this chat's replies were written with (5 min or 1 hour).
 async function detect($: EngineInterface) {
-  if (!sid) return
-  const r = await $.process.run(['python3', `${$.plugin.root}/bin/ttl.py`, sid])
-  const out = r.stdout.trim()
-  if (out === '5m' || out === '1h') detected = out
-  else if (r.exitCode !== 0) await log($, `ttl check failed: ${r.stderr.slice(0, 200)}`)
+  const path = await findTranscript($)
+  if (!path) return
+  const r = await $.process.run(['tail', '-c', String(TAIL_BYTES), path])
+  if (r.exitCode !== 0) return log($, `ttl check failed: ${r.stderr.slice(0, 200)}`)
+  const found = ttlFromTail(r.stdout)
+  if (found !== 'unknown') detected = found
 }
 
 // A main-chat reply just ended: the cache is warm again from now.
@@ -274,7 +268,7 @@ async function restart($: EngineInterface) {
 // Once a second: moves the countdown while the band shows.
 async function tick($: EngineInterface) {
   const c = await getClock($)
-  if (!c || off || hidden || !c.lastEnd) return
+  if (!c || hidden || !c.lastEnd) return
   const now = await $.clock.now()
   // A cold clock only needs a redraw once a minute, for its "went cold" line.
   const cold = now - c.lastEnd >= c.ttlMs
@@ -282,28 +276,41 @@ async function tick($: EngineInterface) {
   await setClock($, { ...c, now })
 }
 
+async function setNote($: EngineInterface, note: string) {
+  const c = await getClock($)
+  if (c) await setClock($, { ...c, note })
+}
+
 async function handoff($: EngineInterface) {
   const c = await getClock($)
+  const request = `${home}/.claude/handoffs/.request-${sid}`
   // The handoff mod picks this file up within 5 seconds.
-  await $.fs.write(`${home}/.claude/handoffs/.request-${sid}`, String(await $.clock.now()))
+  await $.fs.write(request, String(await $.clock.now()))
   await log($, `asked for a handoff at ${short(c?.tokens ?? 0)}`)
-  if (c) await setClock($, { ...c, note: 'Handoff asked for. Watch the Refresh panel.' })
+  await setNote($, 'Handoff asked for. Watch the Refresh panel.')
+  // Nobody took it: the handoff mod is not running in this chat.
+  $.clock.after(HANDOFF_WAIT_MS, () => {
+    void (async () => {
+      if (!(await $.fs.exists(request).catch(() => false))) return
+      await $.process.run(['rm', '-f', request])
+      await log($, 'handoff request not taken: the handoff mod is not running')
+      await setNote($, "Handoff isn't running: install handoff@joel-skills.")
+    })().catch(() => undefined)
+  })
 }
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     sid = await $.session.id()
-    home = $.plugin.root.split('/.claude/')[0] ?? ''
+    home = (await $.env.get('HOME').catch(() => undefined)) ?? ''
+    const { value: wasHidden = false } = await $.state.get(HIDDEN)
+    hidden = wasHidden
     // The 60 s demo is for one chat only. Older versions saved it for every chat, so clear that.
     demo = false
     if ((await $.store.get('demo').catch(() => undefined)) === true) {
       await $.store.set('demo', false).catch(() => undefined)
       await log($, 'cleared a demo setting saved by an older version')
     }
-    await readSwitch($).catch(() => undefined)
-    $.clock.every(3000, () => {
-      void readSwitch($).catch(() => undefined)
-    })
     await $.command.register({
       name: 'cacheclock',
       description: 'Cache Clock: show or hide it. "/cacheclock hide" hides it, "/cacheclock demo" uses a 60 s cache for filming, "/cacheclock auto" goes back',
@@ -324,15 +331,19 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // The engine's own answer to where this chat's transcript is.
+  on('classic.Stop', async ($, e, next) => {
+    if (typeof e.transcript_path === 'string' && e.transcript_path) transcriptPath = e.transcript_path
+    return next(e)
+  })
+
   on('turn.start', async ($, e, next) => {
-    if (off) return next(e)
     // Should the engine ever raise a turn for the ping's own fork, it is not the person's turn.
     if (!(pinging && e.text === PING_PROMPT)) working = true
     return next(e)
   })
 
   on('turn.complete', async ($, e, next) => {
-    if (off) return next(e)
     const result = await next(e)
     // A helper's turn does not touch the main chat's cache.
     if (e.agentId === undefined) {
@@ -344,7 +355,6 @@ export const register: Register = on => {
 
   // The person is back: a prompt of theirs ends keep warm. Its own commands do not.
   on('prompt.submit', async ($, e, next) => {
-    if (off) return next(e)
     const text = e.text.trim().toLowerCase()
     const own = text.startsWith('/keepwarm') || text.startsWith('/cacheclock') || text === PING_PROMPT.toLowerCase()
     if (!own && !BACKGROUND.has(e.origin?.kind ?? '')) {
@@ -354,7 +364,6 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'keepwarm' }, async ($, e) => {
-    if (off) return { text: 'Cache Clock is off. Turn it on with /mods.' }
     const arg = e.args.trim().toLowerCase()
     const w = await getWarm($)
     if (arg === 'off' || (arg !== 'on' && w)) {
@@ -367,14 +376,12 @@ export const register: Register = on => {
   })
 
   on('ui.press', { plugin: 'cache-clock', element: 'keepwarm' }, async ($, e) => {
-    if (off) return { element: e.element }
     if (await getWarm($)) await stopWarm($, 'Keep warm is off.')
     else if ((await startWarm($)) === 'on') toast($, 'Keep warm is on. Type /keepwarm off to stop it.')
     return { element: e.element }
   })
 
   on('command.run', { command: 'cacheclock' }, async ($, e) => {
-    if (off) return { text: 'Cache Clock is off. Turn it on with /mods.' }
     const arg = e.args.trim().toLowerCase()
     const hide = arg === 'hide' || (arg !== 'demo' && arg !== 'auto' && arg !== 'show' && !hidden)
     if (arg === 'demo' || arg === 'auto') {
@@ -384,14 +391,13 @@ export const register: Register = on => {
     await setHidden($, hide)
     const c = await getClock($)
     if (c) await setClock($, { ...c, ...ttl(), now: await $.clock.now() })
-    if (hide) return { text: 'Cache Clock hidden in every chat. Type /cacheclock or open /mods to show it.' }
+    if (hide) return { text: 'Cache Clock hidden in this chat. Type /cacheclock to show it, or /plugin disable cache-clock to turn it off.' }
     const t = ttl()
     const how = lengthLabel({ ttlMs: t.ttlMs, ttlSource: t.ttlSource } as Clock)
-    return { text: `Cache Clock is on: ${how}. Type /cacheclock hide or open /mods to hide it.` }
+    return { text: `Cache Clock is on: ${how}. Type /cacheclock hide to hide it.` }
   })
 
   on('ui.press', { plugin: 'cache-clock', element: 'handoff' }, async ($, e) => {
-    if (off) return { element: e.element }
     await handoff($)
     return { element: e.element }
   })
@@ -399,12 +405,11 @@ export const register: Register = on => {
     const wasWarm = (await getWarm($)) !== null
     await stopWarm($, 'Keep warm stopped: Cache Clock is hidden.', false)
     await setHidden($, true)
-    toast($, `Cache Clock hidden${wasWarm ? ' and keep warm stopped' : ''}. Type /cacheclock or open /mods to show it.`)
+    toast($, `Cache Clock hidden in this chat${wasWarm ? ' and keep warm stopped' : ''}. Type /cacheclock to show it.`)
     return { element: e.element }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (off) return next(e)
     const c = await getClock($)
     if (hidden || !c || !c.lastEnd || working || e.props.isWorking || e.props.hasSurvey) return next(e)
     const rest = await next(e)
@@ -413,33 +418,63 @@ export const register: Register = on => {
     const left = c.lastEnd + c.ttlMs - c.now
     const cost = `${short(c.tokens)} tokens`
     const w = await getWarm($)
+    // A terminal narrower than WIDE gets three rows (clock, cost, buttons) in place of one, so
+    // nothing wraps; the tip costs two more rows, so it shows there only while keeping warm.
+    const cols = typeof e.props.bodyColumns === 'number' && e.props.bodyColumns > 0 ? Math.floor(e.props.bodyColumns) : 0
+    const narrow = cols > 0 && cols < WIDE
+    const roomy = typeof e.props.maxRows !== 'number' || e.props.maxRows >= 6
     const warmButton = w ? <Button key="keepwarm" label="Stop keeping warm" onPress={noop} /> : <Button key="keepwarm" label="Keep warm" onPress={noop} />
-    const warmRow = w ? <Text color={w.cold || w.error ? BAD : COLD}>{warmLine(w, left)}</Text> : null
-    const tip = <Text dimColor>{TIP}</Text>
+    const warmRow = w ? (
+      <Text color={w.cold || w.error ? BAD : COLD} wrap={narrow ? 'truncate-end' : undefined}>
+        {warmLine(w, left)}
+      </Text>
+    ) : null
+    const tip = roomy && (!narrow || w) ? <Text dimColor wrap={narrow ? 'truncate-end' : undefined}>{TIP}</Text> : null
+    const fit = (node: unknown) => (narrow ? <Box width={cols}>{node as never}</Box> : node) as never
 
     if (left > 0) {
       const share = left / c.ttlMs
-      const filled = Math.max(1, Math.round(share * BAR))
       const color = left <= 60_000 ? BAD : share < 0.5 ? WARN : GOOD
+      // "◷ Cache warm 4:30 " and "  5 min cache" take about 32 columns beside the bar.
+      const bar = narrow ? Math.max(MIN_BAR, Math.min(BAR, cols - 34)) : BAR
+      const filled = Math.max(1, Math.round(share * bar))
+      const clock = (
+        <Text>
+          <Text color={color}>◷ Cache warm </Text>
+          <Text bold color={color}>
+            {mmss(left)}
+          </Text>
+          <Text> </Text>
+          <Text color={color}>{'━'.repeat(filled)}</Text>
+          <Text dimColor>{'━'.repeat(bar - filled)}</Text>
+          {narrow ? <Text dimColor>{`  ${shortLabel(c)}`}</Text> : <Text dimColor>{` ${lengthLabel(c)}.`}</Text>}
+          {narrow ? null : <Text dimColor> Reply now and {cost} cost 5 to 10% as much.</Text>}
+        </Text>
+      )
+      const buttons = (
+        <Box key="buttons" flexDirection="row" gap={1}>
+          {warmButton}
+          <Button key="hide" label="Hide" role="dismiss" onPress={noop} />
+        </Box>
+      )
+      if (narrow) {
+        return (
+          <Box flexDirection="column">
+            {rest}
+            {fit(clock)}
+            {roomy ? fit(<Text dimColor wrap="truncate-end">{`Reply now and ${cost} cost 5 to 10% as much.`}</Text>) : null}
+            {buttons}
+            {warmRow ? fit(warmRow) : null}
+            {tip ? fit(tip) : null}
+          </Box>
+        )
+      }
       return (
         <Box flexDirection="column">
           {rest}
           <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
-            <Text>
-              <Text color={color}>◷ Cache warm </Text>
-              <Text bold color={color}>
-                {mmss(left)}
-              </Text>
-              <Text> </Text>
-              <Text color={color}>{'━'.repeat(filled)}</Text>
-              <Text dimColor>{'━'.repeat(BAR - filled)}</Text>
-              <Text dimColor>{` ${lengthLabel(c)}.`}</Text>
-              <Text dimColor> Reply now and {cost} cost 5 to 10% as much.</Text>
-            </Text>
-            <Box flexDirection="row" gap={1}>
-              {warmButton}
-              <Button key="hide" label="Hide" role="dismiss" onPress={noop} />
-            </Box>
+            {clock}
+            {buttons}
           </Box>
           {warmRow}
           {tip}
@@ -449,6 +484,32 @@ export const register: Register = on => {
 
     // The 60 s demo always shows the button, so it can be filmed in a small chat.
     const big = c.tokens >= BIG || c.ttlSource === 'demo'
+    const coldButtons = (
+      <Box key="buttons" flexDirection="row" gap={1}>
+        {big ? <Button key="handoff" label="Hand off to a fresh chat" variant="primary" onPress={noop} /> : null}
+        {warmButton}
+        <Button key="hide" label="Hide" role="dismiss" onPress={noop} />
+      </Box>
+    )
+    const note = c.note ? <Text dimColor wrap={narrow ? 'truncate-end' : undefined}>{c.note}</Text> : null
+    if (narrow) {
+      return (
+        <Box flexDirection="column">
+          {rest}
+          {fit(
+            <Text wrap="truncate-end">
+              <Text color={COLD}>❄ Cache cold</Text>
+              <Text dimColor> since {ago(-left)}.</Text>
+            </Text>,
+          )}
+          {roomy ? fit(<Text dimColor wrap="truncate-end">{`Your next message re-reads ${cost} at full cost.`}</Text>) : null}
+          {coldButtons}
+          {warmRow ? fit(warmRow) : null}
+          {note ? fit(note) : null}
+          {tip ? fit(tip) : null}
+        </Box>
+      )
+    }
     return (
       <Box flexDirection="column">
         {rest}
@@ -457,14 +518,10 @@ export const register: Register = on => {
             <Text color={COLD}>❄ Cache cold</Text>
             <Text dimColor> since {ago(-left)}. Your next message re-reads {cost} at full cost.</Text>
           </Text>
-          <Box flexDirection="row" gap={1}>
-            {big ? <Button key="handoff" label="Hand off to a fresh chat" variant="primary" onPress={noop} /> : null}
-            {warmButton}
-            <Button key="hide" label="Hide" role="dismiss" onPress={noop} />
-          </Box>
+          {coldButtons}
         </Box>
         {warmRow}
-        {c.note ? <Text dimColor>{c.note}</Text> : null}
+        {note}
         {tip}
       </Box>
     )
