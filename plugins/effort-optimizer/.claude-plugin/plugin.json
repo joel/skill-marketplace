@@ -1,10 +1,39 @@
 {
   "name": "effort-optimizer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Reads each prompt, picks the effort level it needs with Ben's four-question framework, and offers Switch to that level, or sets it by itself in auto mode",
   "author": {
     "name": "Ben AI",
     "url": "https://www.benai.co"
   },
-  "types": "./types/index.d.ts"
+  "types": "./types/index.d.ts",
+  "repository": "https://github.com/joel/skill-marketplace",
+  "keywords": [
+    "mod",
+    "effort",
+    "terminal",
+    "zellij"
+  ],
+  "userConfig": {
+    "mode": {
+      "type": "string",
+      "title": "Mode",
+      "description": "suggest asks before switching the effort level; auto switches it by itself on every prompt",
+      "default": "suggest",
+      "options": [
+        "suggest",
+        "auto"
+      ]
+    },
+    "picker_model": {
+      "type": "string",
+      "title": "Picker model",
+      "description": "The model behind the one short check per prompt; Haiku costs less",
+      "default": "claude-sonnet-5-5",
+      "options": [
+        "claude-sonnet-5-5",
+        "claude-haiku-5-5"
+      ]
+    }
+  }
 }
