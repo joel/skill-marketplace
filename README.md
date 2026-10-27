@@ -30,7 +30,7 @@ helper-desk and handoff use the `multiplexer` plugin's `$.mux` interface. They n
 | handoff Open file | your `$EDITOR` in a floating pane | `open` on a Mac, `xdg-open` elsewhere |
 
 - **tmux:** a chat inside tmux behaves as having no multiplexer until someone writes a tmux backend. `plugins/multiplexer/README.md` says how, with a sketch.
-- **The dependency is required.** A mod that depends on `multiplexer` doesn't load without it, and Claude Code names the missing plugin. If an update leaves helper-desk or handoff unloaded, run `claude plugin install multiplexer@joel-skills`.
+- **The dependency is required.** A mod that depends on `multiplexer` doesn't load without it, and Claude Code names the missing plugin. When updating from helper-desk 0.6 or handoff 0.2, install it first with `claude plugin install multiplexer@joel-skills`, then update the mods.
 
 ## Installation (one-time, per machine)
 
@@ -412,6 +412,9 @@ claude --plugin-dir /path/to/skill-marketplace/plugins/<plugin>
 
 - The local copy takes precedence over the installed marketplace version for
   that session.
+- A plugin with `dependencies` needs them loaded too, or it doesn't load: it
+  fails with only a debug-log line. helper-desk and handoff need
+  `--plugin-dir /path/to/skill-marketplace/plugins/multiplexer` beside their own.
 - After editing `SKILL.md` mid-session, run `/reload-plugins` to pick the
   change up.
 - To test the marketplace file itself: `/plugin marketplace add ./skill-marketplace`
