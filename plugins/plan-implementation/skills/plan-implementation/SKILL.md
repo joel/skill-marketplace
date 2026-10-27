@@ -16,7 +16,7 @@ description: >-
   own workflow doc. Do not engage for questions or read-only analysis; defer
   to a project-local skill with the same job when one exists.
 metadata:
-  version: "2.5.0"
+  version: "2.6.0"
   origin: "Genericised from a production Rails project's execution-plan skill"
 ---
 
@@ -367,15 +367,15 @@ preceding code commit before pushing.
 
 **Freshness check first.** Other sessions and agents may have moved things: `main`
 can gain merges, the remote branch can be rebased under you, the next release tag
-can be taken. Before pushing, and again before tagging:
+can be taken. Before pushing, and again before tagging, `git fetch origin` and look at
+`HEAD..origin/main`. If the remote branch moved, reconcile onto it; never clobber it.
+**Behind?** Rebase onto `origin/main` (an already-pushed branch goes out with
+`--force-with-lease`, never `--force`; a branch others build on merges `main`
+instead), regenerate rather than hand-merge generated files, then check what came in
+(dependencies, migrations, newly tracked files) and re-run Step 6 before
+`git push -u origin <branch>`. Procedure: [freshness.md](references/freshness.md).
 
-```bash
-git fetch origin && git log --oneline HEAD..origin/main | head   # anything new under you?
-git push -u origin <branch-name>
-```
-
-If the remote branch moved, reconcile onto its version; do not clobber it. After the
-freshness check and before this run's first push, run **consolidation Pass 1**:
+After the freshness check and before this run's first push, run **consolidation Pass 1**:
 confirmed candidates that pass the five gates go into their own docs commit, pushed
 with the code and named in the PR body (never as a docs-only PR tip, Step 8b).
 
