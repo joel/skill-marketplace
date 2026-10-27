@@ -1,13 +1,18 @@
 {
   "name": "handoff",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "At 250k tokens, offers Refresh: writes a handoff of the whole chat, shows the steps with progress bars, then copies it or starts a new chat with it. Logs every run to ~/.claude/handoffs/handoff.log and saves a draft first",
   "author": {
     "name": "Ben AI",
     "url": "https://www.benai.co"
   },
   "repository": "https://github.com/joel/skill-marketplace",
-  "keywords": ["mod", "handoff", "context", "zellij"],
+  "keywords": [
+    "mod",
+    "handoff",
+    "context",
+    "multiplexer"
+  ],
   "types": "./types/index.d.ts",
   "userConfig": {
     "offer": {
@@ -15,7 +20,10 @@
       "title": "Refresh offer",
       "description": "auto shows the Refresh row once the chat reaches offer_at tokens; off never offers it (/refresh and /handoff still work)",
       "default": "auto",
-      "options": ["auto", "off"]
+      "options": [
+        "auto",
+        "off"
+      ]
     },
     "offer_at": {
       "type": "number",
@@ -23,5 +31,8 @@
       "description": "Context size at which the Refresh row offers a handoff",
       "default": 250000
     }
-  }
+  },
+  "dependencies": [
+    "multiplexer"
+  ]
 }
