@@ -1,4 +1,4 @@
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, RenderSurface } from 'claude-code'
 
 import type { BandPlan, Helper, HelperPhase, PlanStatus, Step, StepKind } from '../types'
 import { connectorName, splitTool } from './connectors'
@@ -36,6 +36,12 @@ const BAD = '#dc2626'
 const WARN = '#eab308'
 const INK = '#1c1917'
 // The task bar is a purple gradient, light at the start and deep at the head (after Johnny's Savvy Progress).
+// The pane's colours. The terminal takes Claude Code's theme keys, so an ANSI theme draws the
+// pane in the terminal's own palette (a Zellij theme, say); the app keeps its fixed look.
+const PANE_HEX = { accent: ACCENT, good: GOOD, bad: BAD, warn: WARN, on: '#ffffff', onWarn: INK }
+const PANE_THEME = { accent: 'claude', good: 'success', bad: 'error', warn: 'warning', on: 'inverseText', onWarn: 'inverseText' }
+const paneColors = (surface: RenderSurface) => (surface === 'terminal' ? PANE_THEME : PANE_HEX)
+
 const P_LIGHT = '#c4b5fd'
 const P_MID = '#8b5cf6'
 const P_DEEP = '#6d28d9'
@@ -1218,6 +1224,7 @@ export const register: Register = (on, options) => {
     if (!deskOn()) return next(e)
     const els = $.ui.resolve(e)
     const { Box, Text, Button } = els
+    const C = paneColors(e.surface)
     // The app needs a gap between rows (its smallest step, as the other bands use); the terminal 0.
     const rowGap = e.surface === 'terminal' ? 0 : 'xs'
     // Svg draws on desktop, the editor and mobile; the terminal gets a glyph.
@@ -1271,7 +1278,7 @@ export const register: Register = (on, options) => {
       const live = hp.phase === 'working'
       const isOpen = view.open.includes(hp.id)
       const mark = live ? '●' : hp.phase === 'done' ? '✓' : '✗'
-      const markColor = hp.phase === 'failed' ? BAD : GOOD
+      const markColor = hp.phase === 'failed' ? C.bad : C.good
       const time = clockTime((live ? Math.max(clk.now, hp.startedAt) : hp.endedAt) - hp.startedAt)
       const meta = [hp.hasUsage ? `${tokenText(hp.tokens + hp.turnTokens)} tokens` : '', time].filter(Boolean).join(' · ')
       const who = [hp.type, hp.model, hp.effort].filter(Boolean).join(' · ')
@@ -1287,7 +1294,7 @@ export const register: Register = (on, options) => {
       const leadW = Math.max(6, cw - (live ? 2 + pulse.length + 1 : 0))
       const history = (live ? hp.steps.slice(0, -1) : hp.steps).slice(-HISTORY)
       const [b1, b2, b3] = barParts(hp.phase, cw, clk.tick, hp.seat)
-      const barColor = hp.phase === 'failed' ? BAD : hue.color
+      const barColor = hp.phase === 'failed' ? C.bad : hue.color
       const rowW = cw - TAG_W
       // About 6.5 CSS pixels a column, as the pet's 48 pixels fill its 8.
       const barPx = Math.max(60, Math.floor(cw * 6.5))
@@ -1322,13 +1329,13 @@ export const register: Register = (on, options) => {
               <Text dimColor>{meta}</Text>
             </Box>
             <Box flexDirection="row" width={cw} marginTop={1}>
-              {live ? <Text bold color={ACCENT}>{`${spin} `}</Text> : null}
+              {live ? <Text bold color={C.accent}>{`${spin} `}</Text> : null}
               <Box width={leadW}>
-                <Text bold={live} color={live ? ACCENT : hp.phase === 'done' ? GOOD : BAD} wrap="truncate-end">
+                <Text bold={live} color={live ? C.accent : hp.phase === 'done' ? C.good : C.bad} wrap="truncate-end">
                   {cut(lead, leadW)}
                 </Text>
               </Box>
-              {live ? <Text color={ACCENT}>{` ${pulse}`}</Text> : null}
+              {live ? <Text color={C.accent}>{` ${pulse}`}</Text> : null}
             </Box>
             {!isOpen &&
               history.map((st, i) => (
@@ -1410,7 +1417,7 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column" width={width}>
         <Box key="header" flexDirection="row" justifyContent="space-between" gap={1} width={width} marginBottom={1}>
-          <Text bold color={running.length ? ACCENT : list.length ? GOOD : undefined}>
+          <Text bold color={running.length ? C.accent : list.length ? C.good : undefined}>
             {list.length ? `${list.length} subagent${list.length === 1 ? '' : 's'} in this chat` : 'No subagents yet'}
           </Text>
           <Button key="hide" label="Hide" dimColor onPress={() => undefined} />
@@ -1422,7 +1429,7 @@ export const register: Register = (on, options) => {
                 <Text dimColor wrap="truncate-end">
                   {t.label}
                 </Text>
-                <Text bold color={ACCENT} wrap="truncate-end">
+                <Text bold color={C.accent} wrap="truncate-end">
                   {t.value}
                 </Text>
               </Box>
@@ -1430,9 +1437,9 @@ export const register: Register = (on, options) => {
           </Box>
         ) : null}
         {list.length ? null : <Text dimColor>Cards show up here when Claude starts a subagent.</Text>}
-        {group('running', 'Running', running, GOOD, '#ffffff')}
-        {group('finished', 'Finished', finished, WARN, INK)}
-        {group('stopped', 'Stopped', stopped, BAD, '#ffffff')}
+        {group('running', 'Running', running, C.good, C.on)}
+        {group('finished', 'Finished', finished, C.warn, C.onWarn)}
+        {group('stopped', 'Stopped', stopped, C.bad, C.on)}
       </Box>
     )
   })
