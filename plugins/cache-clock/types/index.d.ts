@@ -11,6 +11,8 @@ export type Clock = {
   now: number
   /** A line under the band after a button press. */
   note: string
+  /** The engine's estimate, in USD, of re-caching the chat; set on a resume, gone after the next reply. */
+  usd?: number
 }
 
 export type Warm = {

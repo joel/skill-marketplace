@@ -85,6 +85,7 @@ function rig(on: On, seed: Partial<Rig> = {}) {
   })
   on('prompt.submit', async ($, e) => ({ text: (e as { text: string }).text }) as never)
   on('turn.complete', async () => ({ text: '' }) as never)
+  on('classic.SessionStart', async () => ({}) as never)
   on('ui.render', { component: 'AbovePrompt' }, async ($, e) => {
     const { Text } = $.ui.resolve(e)
     return <Text>REST</Text>
@@ -163,6 +164,41 @@ test('the countdown starts at the last request, not at the end of the reply', { 
   const v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band() })
   expect(await v.find({ text: /3:10/ }), '5:00 less the 110 s since the main request').toBeDefined()
 })
+
+test('a resumed chat shows its clock at once: warm with the time left, or cold with the engine\'s price', { timeoutMs: 30000 }, async ($, on) => {
+  rig(on)
+  await $.session.start({ ...begin, surface: 'terminal' } as never)
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: 180, context_tokens: 120_000, transcript_path: TRANSCRIPT } as never)
+  let v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band() })
+  expect(await v.find({ text: /2:00/ }), '5 min cache, 3 min ago').toBeDefined()
+
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: 7200, context_tokens: 120_000, estimated_cache_write_usd: 0.6, transcript_path: TRANSCRIPT } as never)
+  v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band() })
+  expect(await v.find({ text: /Cache\ cold/ })).toBeDefined()
+  expect(await v.find({ text: /re-reads 120k tokens at full cost \(about \$0\.60\)/ }), 'the engine\'s estimate').toBeDefined()
+
+  // A resume the engine gives no age for drops the old clock rather than showing it.
+  await $.classic.SessionStart({ source: 'resume', transcript_path: TRANSCRIPT } as never)
+  v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band() })
+  expect(await v.find({ key: 'hide' }), 'no clock').toBeUndefined()
+})
+
+for (const source of ['clear', 'compact'] as const) {
+  test(`/${source} drops the clock until the next reply`, { timeoutMs: 30000 }, async ($, on) => {
+    const { clock } = rig(on)
+    await $.session.start({ ...begin, surface: 'terminal' } as never)
+    await $.turn.complete({ answer: '' } as never)
+    await clock.settle()
+    await $.classic.SessionStart({ source } as never)
+    let v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band() })
+    expect(await v.find({ key: 'hide' }), 'no clock').toBeUndefined()
+    expect(await v.find({ text: 'REST' }), 'other bands still draw').toBeDefined()
+    await $.turn.complete({ answer: '' } as never)
+    await clock.settle()
+    v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band() })
+    expect(await v.find({ text: /Cache\ warm/ }), 'back after a reply').toBeDefined()
+  })
+}
 
 test('the app spaces the band rows so its buttons do not sit on the text; the terminal does not', { timeoutMs: 30000 }, async ($, on) => {
   const { clock } = rig(on)

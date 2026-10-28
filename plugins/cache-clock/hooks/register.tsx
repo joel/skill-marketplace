@@ -71,6 +71,8 @@ async function setHidden($: EngineInterface, value: boolean) {
 }
 
 const short = (tokens: number) => `${Math.round(tokens / 1000)}k`
+/** "at full cost", with the engine's price when it gave one (after a resume). */
+const fullCost = (c: Clock) => (c.usd ? `at full cost (about $${c.usd.toFixed(2)})` : 'at full cost')
 const mmss = (ms: number) => {
   const s = Math.max(0, Math.ceil(ms / 1000))
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
@@ -336,6 +338,35 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // A resumed or forked chat starts with no clock: seed it from how long ago its last reply was.
+  // A cleared or compacted chat sends a new prefix, so the old clock no longer applies.
+  on('classic.SessionStart', async ($, e, next) => {
+    const r = await next(e)
+    if (e.source !== 'clear' && e.source !== 'compact' && e.source !== 'resume' && e.source !== 'fork') return r
+    sid = await $.session.id()
+    transcriptPath = typeof e.transcript_path === 'string' ? e.transcript_path : ''
+    detected = 'unknown'
+    stepAt = 0
+    // The old chat's clock and keep warm never carry over, seeded or not.
+    await stopWarm($, `Keep warm stopped: the chat was ${e.source === 'clear' ? 'cleared' : e.source === 'compact' ? 'compacted' : 'switched'}.`, false)
+    await setClock($, null)
+    if ((e.source === 'resume' || e.source === 'fork') && typeof e.seconds_since_last_response === 'number') {
+      await detect($).catch(() => undefined)
+      const now = await $.clock.now()
+      const usd = e.estimated_cache_write_usd
+      await setClock($, {
+        lastEnd: now - e.seconds_since_last_response * 1000,
+        ...ttl(),
+        tokens: e.context_tokens ?? 0,
+        now,
+        note: '',
+        ...(typeof usd === 'number' && usd > 0 ? { usd } : {}),
+      })
+    }
+    $.ui.invalidate('ui.render')
+    return r
+  }).catch(($, e, next) => next(e)) // a clock that fails to seed never holds up the session
+
   // The engine's own answer to where this chat's transcript is.
   on('classic.Stop', async ($, e, next) => {
     if (typeof e.transcript_path === 'string' && e.transcript_path) transcriptPath = e.transcript_path
@@ -443,7 +474,7 @@ export const register: Register = on => {
     const oneRow =
       left > 0
         ? `◷ Cache warm ${mmss(left)} ${'━'.repeat(BAR)} ${lengthLabel(c)}. Reply now and ${cost} cost 5 to 10% as much.`
-        : `❄ Cache cold since ${ago(-left)}. Your next message re-reads ${cost} at full cost.`
+        : `❄ Cache cold since ${ago(-left)}. Your next message re-reads ${cost} ${fullCost(c)}.`
     // The engine keeps the last few columns for its own [-] control.
     const narrow = cols > 0 && cols < oneRow.length + buttonsW + 6
     const roomy = typeof e.props.maxRows !== 'number' || e.props.maxRows >= 6
@@ -529,7 +560,7 @@ export const register: Register = on => {
               <Text dimColor> since {ago(-left)}.</Text>
             </Text>,
           )}
-          {roomy ? fit(<Text dimColor wrap="truncate-end">{`Your next message re-reads ${cost} at full cost.`}</Text>) : null}
+          {roomy ? fit(<Text dimColor wrap="truncate-end">{`Your next message re-reads ${cost} ${fullCost(c)}.`}</Text>) : null}
           {coldButtons}
           {warmRow ? fit(warmRow) : null}
           {note ? fit(note) : null}
@@ -543,7 +574,7 @@ export const register: Register = on => {
         <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
           <Text>
             <Text color={COLD}>❄ Cache cold</Text>
-            <Text dimColor> since {ago(-left)}. Your next message re-reads {cost} at full cost.</Text>
+            <Text dimColor> since {ago(-left)}. Your next message re-reads {cost} {fullCost(c)}.</Text>
           </Text>
           {coldButtons}
         </Box>

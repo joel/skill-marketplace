@@ -23,3 +23,7 @@ Changes in 0.5.0:
   the turn. The approach is adapted from ribbon by Jay E / RoboNuggets
   (https://github.com/robonuggets/ribbon), MIT License,
   Copyright (c) 2026 Jay E | RoboNuggets (robonuggets.com).
+
+Changes in 0.6.0:
+- A resumed or forked chat seeds the clock from classic.SessionStart, and
+  /clear and /compact drop it, also adapted from ribbon (see 0.5.0).
