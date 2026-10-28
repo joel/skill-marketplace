@@ -15,7 +15,7 @@ Marketplace name: `joel-skills`. Catalog: `.claude-plugin/marketplace.json`.
 | `joel-tone` | Rewrites drafts, emails, Slack messages, proposals, or LLM-generated copy into Joel's voice so they read like a careful human wrote them. Picks the register first (public Vogon Partners copy or Joel's own messages), then applies the hard rules: no em or en dashes, no invented facts, no empty intensifiers, no filled-template rhythm. Ships the public-website voice brief as a reference. Returns paste-ready text plus a short note on what changed and what to check. |
 | `helper-desk` | A Claude Code mod (a hooks module, not a skill) by [Ben AI](https://www.benai.co), redistributed with permission. A purple task bar above the prompt fills as Claude ticks off its plan, and the Helper Desk pane shows one live card per subagent: its current step, tokens, time and a progress bar. Registers a `plan` tool and `/helpers`, and adds a short system-prompt section plus plan nudges to every session while it is enabled. Built and tested on Claude Code 2.1.311 (upstream 0.4.0 needed 2.1.287 or newer). See [helper-desk 0.7.1](#cache-clock-042-effort-optimizer-021-helper-desk-071-2026-10-28). |
 | `handoff` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. When a chat reaches 250k tokens (configurable), a Refresh row offers to move the work to a fresh chat. It writes a handoff of the whole chat (what was asked, decided and done, files to open, next steps) with one model call, saves a draft first, and keeps every handoff in `~/.claude/handoffs/`. Then it copies the handoff, or starts the new chat: in a Zellij pane beside this one, or in the desktop app. `/refresh` shows the row, `/handoff` writes one now. Pairs with cache-clock's "Hand off" button. See [handoff 0.2.0](#handoff-020-2026-10-27). |
-| `cache-clock` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. Counts down above the prompt until the chat's prompt cache goes cold (5 min or 1 hour, read from the chat's transcript), so you know when a reply is still cheap. Keep warm (`/keepwarm`) sends a tiny background ping before the cache expires. When a big chat goes cold, "Hand off to a fresh chat" runs the handoff mod, so install both. Fits narrow terminals and Zellij panes. See [cache-clock 0.4.2](#cache-clock-042-effort-optimizer-021-helper-desk-071-2026-10-28). |
+| `cache-clock` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. Counts down above the prompt until the chat's prompt cache goes cold (5 min or 1 hour, read from the chat's transcript), so you know when a reply is still cheap. Keep warm (`/keepwarm`) sends a tiny background ping before the cache expires. When a big chat goes cold, "Hand off to a fresh chat" runs the handoff mod, so install both. Fits narrow terminals and Zellij panes. See [cache-clock 0.5.0](#cache-clock-050-2026-10-28). |
 | `effort-optimizer` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. Before Claude starts on a prompt, one short model call reads it and picks the effort level it needs (low to max) with Ben's four-question framework. In `suggest` mode a question offers the switch; in `auto` mode it switches by itself. The level goes on this chat's requests only, never into your own effort setting, and the footer shows it (`Effort Low`). Settings in `/config`; `/effort-optimizer` shows the real level. See [effort-optimizer 0.2.1](#cache-clock-042-effort-optimizer-021-helper-desk-071-2026-10-28). |
 | `multiplexer` | Not a mod you see: a plugin that gives mods one interface to terminal multiplexers (`$.mux`). helper-desk and handoff use it for floating windows, panes beside the chat and a floating editor, and Claude Code installs it with them. Zellij is supported. With no multiplexer, each call has a defined "none" answer and each mod falls back (see [Terminal multiplexers](#terminal-multiplexers)). tmux and others can be added as a backend. See [multiplexer 0.1.0](#multiplexer-010-2026-10-27). |
 
@@ -84,6 +84,15 @@ allowed), and it is the only PR that bumps the version. A rename cannot land on
 forbids an entry without a directory.
 
 ## Release notes
+
+### cache-clock 0.5.0 (2026-10-28)
+
+The countdown now starts when Claude's last request in a reply was sent, not
+when the reply finished. The prompt cache's timer starts at the request, so a
+long reply used to make the clock show more time left than the cache had, and
+keep warm could ping after a 5 minute cache had already expired. Requests made
+by subagents still leave the clock alone. The idea comes from
+[ribbon](https://github.com/robonuggets/ribbon) by Jay E (RoboNuggets, MIT).
 
 ### cache-clock 0.4.2, effort-optimizer 0.2.1, helper-desk 0.7.1 (2026-10-28)
 

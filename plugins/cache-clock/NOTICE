@@ -17,3 +17,9 @@ Changes from 0.3.0 (in 0.4.0):
 - When its one row would wrap, the band uses three short rows instead.
 - Tests were rewritten to match the changes above.
 Everything else is the upstream code.
+
+Changes in 0.5.0:
+- The clock starts at each main-thread request (turn.step), not at the end of
+  the turn. The approach is adapted from ribbon by Jay E / RoboNuggets
+  (https://github.com/robonuggets/ribbon), MIT License,
+  Copyright (c) 2026 Jay E | RoboNuggets (robonuggets.com).
