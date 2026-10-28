@@ -49,6 +49,8 @@ function rig(on: On, files: Record<string, string>, env: Record<string, string> 
   const agents: Agent[] = []
   const statuses: (string | undefined)[] = []
   const opened: string[] = []
+  // Each open as it was asked for, so a test can check its options beside its id.
+  const opens: { id: string; backgroundColor?: string }[] = []
   const closed: string[] = []
   const ran: string[][] = []
   const toasts: string[] = []
@@ -79,6 +81,7 @@ function rig(on: On, files: Record<string, string>, env: Record<string, string> 
   on('agent.list', async () => ({ value: agents.map(a => ({ ...a })) }) as never)
   on('ui.open', async ($, e) => {
     opened.push((e as { id: string }).id)
+    opens.push(e as { id: string; backgroundColor?: string })
     return { value: { isPlaced: true } } as never
   })
   on('ui.close', async ($, e) => {
@@ -137,7 +140,7 @@ function rig(on: On, files: Record<string, string>, env: Record<string, string> 
     }
     return { value: { exitCode: 0, stdout, stderr: '' } } as never
   })
-  return { agents, statuses, opened, closed, ran, clock, toasts, panes }
+  return { agents, statuses, opened, opens, closed, ran, clock, toasts, panes }
 }
 
 /** What the band says: the drawing's alt text on desktop, every text in the terminal. */
@@ -165,7 +168,7 @@ const props = (bodyColumns = 60) =>
 
 for (const surface of ['desktop', 'terminal'] as const) {
   test(`two helpers get live cards, then both are done (${surface})`, { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
-    const { agents, statuses, opened, clock } = rig(on, {})
+    const { agents, statuses, opened, opens, clock } = rig(on, {})
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
     // A plain signature: the connector-typed one is too deep for tsc.
     const callTool = $.tool.call as unknown as (input: unknown) => Promise<unknown>
@@ -176,6 +179,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     await spawn('Find invoice threads', 'general-purpose', 'opus', 2)
     await clock.settle()
     expect(opened, 'pane opened by itself').toContain('helpers')
+    expect(opens.at(-1)?.backgroundColor, 'the terminal pane paints no background of its own; the app keeps its look').toBe(surface === 'terminal' ? 'transparent' : undefined)
 
     await callTool({ tool: 'Read', tool_use_id: 'c1', file_path: '/Users/test/vault/research.md', agentId: 'agent-a1' } as never)
     await callTool({ tool: 'mcp__00000000-0000-0000-0000-00000000000a__search_threads', tool_use_id: 'c2', query: 'invoice', agentId: 'agent-a2' } as never)
@@ -379,13 +383,14 @@ for (const surface of ['desktop', 'terminal'] as const) {
   })
 
   test(`pane: manual: helpers are tracked but the pane opens only on /helpers (${surface})`, { plugins: [fakeMux], timeoutMs: 30000, options: { pane: 'manual' } }, async ($, on) => {
-    const { opened, clock } = rig(on, {})
+    const { opened, opens, clock } = rig(on, {})
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
     await $.agent.spawn({ tool_use_id: 's1', prompt: 'x', description: 'Build the landing page', subagentType: 'general-purpose' } as never)
     await clock.settle()
     expect(opened, 'no auto open').not.toContain('helpers')
     await $.command.run({ command: 'helpers', args: '' } as never)
     expect(opened, '/helpers opens it').toContain('helpers')
+    expect(opens.at(-1)?.backgroundColor, 'the terminal pane paints no background of its own; the app keeps its look').toBe(surface === 'terminal' ? 'transparent' : undefined)
     const v = await $.ui.mount({ plugin: 'helper-desk', surface, component: 'Pane', requestId: 'helpers', props: props() })
     expect(await v.find({ text: /Build the landing page/ }), 'the card draws').toBeDefined()
   })

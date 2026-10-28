@@ -1,4 +1,4 @@
-import type { EngineInterface, Register, RenderSurface } from 'claude-code'
+import type { EngineInterface, PaneOpenArgs, Register, RenderSurface } from 'claude-code'
 
 import type { BandPlan, Helper, HelperPhase, PlanStatus, Step, StepKind } from '../types'
 import { connectorName, splitTool } from './connectors'
@@ -412,7 +412,7 @@ async function addHelper($: EngineInterface, id: string, description: string, ty
   // The pane opens by itself when a new round of helpers starts.
   if (!wasIdle || hidden) return
   if (paneMode === 'float' && canFloat && interactive) void openFloat($).catch(err => log($, `float: ${String(err)}`))
-  else if (paneMode === 'auto' || paneMode === 'float') void $.ui.open({ id: PANE, title: TITLE }).catch(err => log($, `open: ${String(err)}`))
+  else if (paneMode === 'auto' || paneMode === 'float') void openPane($).catch(err => log($, `open: ${String(err)}`))
 }
 
 /** A loop whose spawn this mod missed (a reload, a race): take it from $.agent.list(). */
@@ -475,8 +475,16 @@ async function setHidden($: EngineInterface, value: boolean) {
   await closeFloat($)
 }
 
+/** Opens the docked pane: the one place its open options live. */
 async function openPane($: EngineInterface) {
-  await $.ui.open({ id: PANE, title: TITLE })
+  const pane: PaneOpenArgs = { id: PANE, title: TITLE }
+  // In the terminal the chat paints no background, so the terminal's own shows there, while the
+  // pane's host paints its sidebar grey over the body. Transparent paints nothing, so the pane
+  // matches the chat whatever the terminal, the theme or the multiplexer paints; a raw colour
+  // (the multiplexer theme's bg, say) is right only while it matches what is painted. The app
+  // keeps its own look.
+  if (surface === 'terminal') pane.backgroundColor = 'transparent'
+  await $.ui.open(pane)
 }
 
 // ---------- The plan: one list per chat, shared with chat-inventory through a file ----------
@@ -741,6 +749,8 @@ let canFloat = false
 let muxTheme: MuxTheme | null = null
 // Only a chat someone watches opens a float by itself, not `claude -p` started in a multiplexer.
 let interactive = false
+// Where the chat draws, from the session start: the terminal, the app, or null for `claude -p`.
+let surface: RenderSurface | null = null
 // The floating pane and the frame file it reads, also kept in $.state so a reload neither loses
 // nor doubles it. The file is fixed at open: a /clear changes the session id.
 let floatPane: FloatPane | null = null
@@ -1099,6 +1109,7 @@ export const register: Register = (on, options) => {
     muxTheme = await muxPalette($)
     if (muxTheme) $.ui.log(`helper-desk: the pane takes its colours from the multiplexer's ${muxTheme.name} theme.`, { to: 'debug' })
     interactive = e.isInteractive
+    surface = e.surface
     // A reload starts the module over: take the open float back from $.state.
     const { value: floated = null } = await $.state.get(FLOAT)
     if (!floatPane && floated) {

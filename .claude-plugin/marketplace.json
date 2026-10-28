@@ -74,7 +74,7 @@
         "url": "https://www.benai.co"
       },
       "category": "productivity",
-      "version": "0.8.0",
+      "version": "0.8.1",
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/joel/skill-marketplace.git",
