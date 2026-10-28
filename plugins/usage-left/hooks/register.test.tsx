@@ -73,6 +73,8 @@ test('a narrow band drops the dot bar, then stacks the windows', { timeoutMs: 30
   expect(compact.text).toBe('REST7D 59% · 3d 9h5H 96% · 2h 10m')
   const stacked = await rows(26)
   expect(stacked.types, 'one row per window').toEqual(['Text', 'Text', 'Text'])
+  const tiny = await rows(4)
+  expect(tiny.types, 'a band narrower than the engine\'s own margin still stacks').toEqual(['Text', 'Text', 'Text'])
 })
 
 test('no windows (an API key, not a subscription): nothing drawn', { timeoutMs: 30000 }, async ($, on) => {

@@ -48,7 +48,7 @@ export const register: Register = on => {
     const now = await $.clock.now()
     const pieces = list.map(w => pieceOf(w, now))
     // The engine keeps the last few columns for its own [-] control.
-    const cols = typeof e.props.bodyColumns === 'number' && e.props.bodyColumns > 0 ? Math.floor(e.props.bodyColumns) - 6 : 0
+    const cols = typeof e.props.bodyColumns === 'number' && e.props.bodyColumns > 0 ? Math.max(1, Math.floor(e.props.bodyColumns) - 6) : 0
     const layout = layoutOf(pieces, cols)
     const full = layout === 'full'
 
