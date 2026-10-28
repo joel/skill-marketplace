@@ -37,3 +37,8 @@ Changes in 0.8.0:
   and the floating window take the theme's colours through $.mux.theme():
   the accent, status and group colours, the step tags, and the eight pet
   colours. With no theme the 0.7.2 behaviour stays. The app is unchanged.
+
+Changes in 0.8.1:
+- In the terminal, the Helpers pane opens with backgroundColor
+  "transparent", so its body paints nothing and sits on the terminal's own
+  background like the chat beside it. The app is unchanged.
