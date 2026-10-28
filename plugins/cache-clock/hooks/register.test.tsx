@@ -235,6 +235,21 @@ test('a priced model shows dollars, warm then cold', { timeoutMs: 30000 }, async
   expect(await v.find({ text: /cost about \$0\.04, not \$1\.50/ }), 'warm uses the engine estimate').toBeDefined()
 })
 
+test('a subagent starting after the reply leaves the band and keep warm alone', { timeoutMs: 30000 }, async ($, on) => {
+  const { r, clock } = rig(on)
+  await $.session.start({ ...begin, surface: 'terminal' } as never)
+  await $.turn.complete({ answer: '' } as never)
+  await clock.settle()
+  // A background subagent starts, and is still running.
+  await $.turn.start({ turnId: 't2', text: 'task', agentId: 'a1' } as never)
+  const v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band() })
+  expect(await v.find({ text: /Cache\ warm/ }), 'still shown').toBeDefined()
+  await $.command.run({ command: 'keepwarm', args: '' } as never)
+  await clock.advance(4 * 60_000 + 20_000)
+  await clock.settle()
+  expect(r.forks.length, 'keep warm still pings').toBe(1)
+})
+
 test('the app spaces the band rows so its buttons do not sit on the text; the terminal does not', { timeoutMs: 30000 }, async ($, on) => {
   const { clock } = rig(on)
   for (const [surface, gap] of [['desktop', 'xs'], ['terminal', 0]] as const) {

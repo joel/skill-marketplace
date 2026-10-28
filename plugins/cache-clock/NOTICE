@@ -32,3 +32,7 @@ Changes in 0.7.0:
 - The band prices the next message in dollars (hooks/price.ts), an idea
   from ribbon (see 0.5.0). The prices and the 5 min / 1 hour write
   multipliers are Anthropic's published list prices, not ribbon's table.
+
+Changes in 0.7.1:
+- A subagent's turn no longer marks the chat as working, which hid the
+  band and paused keep warm until the next main reply.
