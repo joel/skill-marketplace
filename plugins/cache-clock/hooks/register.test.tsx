@@ -43,7 +43,7 @@ function rig(on: On, seed: Partial<Rig> = {}) {
     ...seed,
   }
   on('session.start', async ($, e) => ({ cwd: e.cwd }) as never)
-  on('turn.start', async () => ({}) as never)
+  on('turn.start', async () => ({ turnId: 't1' }) as never)
   on('command.register', async () => ({ value: undefined }) as never)
   const clock = mock.clock(on, { now: 1_000_000 })
   on('session.id', async () => ({ value: 'sid' }) as never)
@@ -141,6 +141,28 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await v.find({ text: /Cache\ warm/ }), 'shown by the command').toBeDefined()
   })
 }
+
+test('the countdown starts at the last request, not at the end of the reply', { timeoutMs: 30000 }, async ($, on) => {
+  const { clock } = rig(on)
+  on('turn.step', async function* ($, e) {
+    return { turnId: e.turnId, index: e.index, answer: '', toolUses: [] } as never
+  })
+  await $.session.start({ ...begin, surface: 'terminal' } as never)
+  await $.turn.start({ turnId: 't1', text: 'hi' } as never)
+  await clock.advance(10_000)
+  for await (const _ of $.turn.step({ turnId: 't1', index: 0, model: 'opus', messageCount: 1 } as never));
+  // A helper's request does not touch the main chat's cache.
+  await clock.advance(20_000)
+  for await (const _ of $.turn.step({ turnId: 't1', index: 0, model: 'opus', messageCount: 1, agentId: 'a1' } as never));
+  // Nor does a subagent's turn starting before the main one ends.
+  await $.turn.start({ turnId: 't2', text: 'task', agentId: 'a2' } as never)
+  // The reply then takes 90 s to finish.
+  await clock.advance(90_000)
+  await $.turn.complete({ answer: '' } as never)
+  await clock.settle()
+  const v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band() })
+  expect(await v.find({ text: /3:10/ }), '5:00 less the 110 s since the main request').toBeDefined()
+})
 
 test('the app spaces the band rows so its buttons do not sit on the text; the terminal does not', { timeoutMs: 30000 }, async ($, on) => {
   const { clock } = rig(on)
