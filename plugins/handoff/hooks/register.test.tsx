@@ -8,7 +8,7 @@ const fakeMux = {
   register(on: Parameters<NonNullable<Parameters<typeof test>[2]>>[1]) {
     on('engine.create', async ($, e, next) => ({
       ...(await next(e)),
-      mux: { info: async () => null, openFloating: async () => null, openBeside: async () => null, edit: async () => null, isOpen: async () => null, close: async () => undefined },
+      mux: { info: async () => null, openFloating: async () => null, openBeside: async () => null, edit: async () => null, isOpen: async () => null, close: async () => undefined, theme: async () => null },
     }))
     const ask = async (out: { stdout: string }) => ({ value: JSON.parse(out.stdout || 'null') })
     on('mux.info', async $ => ask(await $.process.run(['fake-mux', 'info', '{}'])))

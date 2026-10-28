@@ -3,7 +3,7 @@
 // redraws it. No pets or spinners here: a frame only changes when the desk does.
 
 import type { BandPlan, Helper } from '../types'
-import { clockTime, cut, hueOf, tokenText } from './text'
+import { type MuxTheme, clockTime, cut, hueOf, tokenText } from './text'
 
 /** The floating pane's size, as shares of the screen; it sits flush in the bottom right corner. */
 export const FLOAT_W = '45%'
@@ -15,10 +15,13 @@ export const FLOAT_REFIT_MS = 1500
 /** The first line of a frame that tells the viewer to quit. */
 export const ENDED = '#ended'
 
+// The colours with no theme; the multiplexer's theme replaces each it has (the pane does the same).
 const GOOD = '#16a34a'
 const BAD = '#dc2626'
 const WARN = '#eab308'
 const ACCENT = '#d97757'
+type FloatColors = { good: string; bad: string; warn: string; accent: string }
+const floatColors = (t: MuxTheme | null | undefined): FloatColors => ({ good: t?.green ?? GOOD, bad: t?.red ?? BAD, warn: t?.yellow ?? WARN, accent: t?.orange ?? ACCENT })
 const P_LIGHT = '#c4b5fd'
 const P_MID = '#8b5cf6'
 const P_DEEP = '#6d28d9'
@@ -43,6 +46,8 @@ export type FloatInput = {
   costUsd: number | null
   /** Columns to draw in. */
   width: number
+  /** The terminal multiplexer's theme ($.mux.theme()); its colours when given. */
+  theme?: MuxTheme | null
 }
 
 function planLines(p: BandPlan, w: number): string[] {
@@ -64,9 +69,9 @@ function planLines(p: BandPlan, w: number): string[] {
   return out
 }
 
-function cardLines(hp: Helper, now: number, w: number): string[] {
+function cardLines(hp: Helper, now: number, w: number, C: FloatColors, theme: MuxTheme | null | undefined): string[] {
   const live = hp.phase === 'working'
-  const mark = live ? fg(hueOf(hp.hue).color, '●') : hp.phase === 'done' ? fg(GOOD, '✓') : fg(BAD, '✗')
+  const mark = live ? fg(hueOf(hp.hue, theme).color, '●') : hp.phase === 'done' ? fg(C.good, '✓') : fg(C.bad, '✗')
   const time = clockTime((live ? Math.max(now, hp.startedAt) : hp.endedAt) - hp.startedAt)
   const meta = [hp.hasUsage ? `${tokenText(hp.tokens + hp.turnTokens)} tokens` : '', time].filter(Boolean).join(' · ')
   const who = [hp.type, hp.model, hp.effort].filter(Boolean).join(' · ')
@@ -81,20 +86,21 @@ function cardLines(hp: Helper, now: number, w: number): string[] {
     `${mark} ${bold(cut(hp.description, w - 2))}`,
     // Tokens and time stay whole; the agent type and model give way first.
     `  ${dim(meta ? `${cut(who, Math.max(0, w - 5 - meta.length))}${who ? ' · ' : ''}${meta}` : cut(who, w - 2))}`,
-    `  ${fg(live ? ACCENT : hp.phase === 'done' ? GOOD : BAD, cut(lead, w - 2))}`,
+    `  ${fg(live ? C.accent : hp.phase === 'done' ? C.good : C.bad, cut(lead, w - 2))}`,
   ]
   if (live) for (const st of hp.steps.slice(0, -1).slice(-2)) out.push(dim(cut(`    ${st.live}`, w)))
   return out
 }
 
 /** One frame: every line ends by clearing the rest of its row, so a shorter frame leaves nothing behind. */
-export function floatFrame({ helpers, plan, now, costUsd, width }: FloatInput): string {
+export function floatFrame({ helpers, plan, now, costUsd, width, theme }: FloatInput): string {
   const w = Math.max(24, width)
+  const C = floatColors(theme)
   const running = helpers.filter(hp => hp.phase === 'working')
   const groups: [string, string, Helper[]][] = [
-    ['Running', GOOD, running],
-    ['Finished', WARN, helpers.filter(hp => hp.phase === 'done')],
-    ['Stopped', BAD, helpers.filter(hp => hp.phase === 'failed')],
+    ['Running', C.good, running],
+    ['Finished', C.warn, helpers.filter(hp => hp.phase === 'done')],
+    ['Stopped', C.bad, helpers.filter(hp => hp.phase === 'failed')],
   ]
   const facts: string[] = []
   if (costUsd !== null) facts.push(`$${costUsd.toFixed(2)}`)
@@ -105,13 +111,13 @@ export function floatFrame({ helpers, plan, now, costUsd, width }: FloatInput): 
     facts.push(clockTime(end - start))
   }
   const count = helpers.length ? `${helpers.length} subagent${helpers.length === 1 ? '' : 's'}` : 'No subagents yet'
-  const lines = [`${bold(fg(running.length ? ACCENT : helpers.length ? GOOD : P_MID, count))}  ${dim(cut(facts.join(' · '), w - count.length - 2))}`, '']
+  const lines = [`${bold(fg(running.length ? C.accent : helpers.length ? C.good : P_MID, count))}  ${dim(cut(facts.join(' · '), w - count.length - 2))}`, '']
   if (plan?.shown && plan.steps.length) lines.push(...planLines(plan, w), '')
   if (!helpers.length) lines.push(dim(cut('Cards show up here when Claude starts a subagent.', w)), '')
   for (const [title, color, members] of groups) {
     if (!members.length) continue
     lines.push(bold(fg(color, `${title} · ${members.length}`)))
-    for (const hp of members) lines.push(...cardLines(hp, now, w), '')
+    for (const hp of members) lines.push(...cardLines(hp, now, w, C, theme), '')
   }
   lines.push(dim(cut('q closes this window · /helpers float toggles it', w)))
   return lines.map(l => `${l}${ESC}K`).join('\n')

@@ -3,6 +3,7 @@
 
 import type { MuxPane } from '../types'
 import { type Backend, lastWord } from './backend'
+import { zellijTheme } from './zellij-theme'
 
 /** "45%" -> "55%": the offset that puts a pane of that share flush with the far edge. */
 const rest = (share: string) => {
@@ -44,4 +45,7 @@ export const zellij: Backend = {
     const id = lastWord(out)
     return id ? { mux: 'zellij', id } : null
   },
+
+  // Its theme: named in config.kdl, defined there or in the themes folder (zellij-theme.ts).
+  theme: zellijTheme,
 }

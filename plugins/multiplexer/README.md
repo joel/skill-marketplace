@@ -16,9 +16,11 @@ The contract is in `types/index.d.ts`:
 | `$.mux.edit({ path, floating? })` | the pane, running the person's `$EDITOR` | `null` |
 | `$.mux.isOpen({ pane })` | `true` or `false` | `null` (cannot tell) |
 | `$.mux.close({ pane })` | nothing | nothing |
+| `$.mux.theme()` | the active theme: `{ name, fg, bg, black, red, green, yellow, blue, magenta, cyan, white, orange }`, each `#rrggbb` or `null` | `null` |
 
 - **`anchor`** is `bottom-right` or `center`.
 - **`width` and `height`** are shares of the screen, such as `"45%"`. A `bottom-right` pane of any size sits flush in the corner.
+- **`theme()`** is Zellij's active theme, read from its files: `theme` in `config.kdl` (`theme_dark` and `theme_light` when both are set, picked by Claude Code's own light or dark setting), the config's `themes {}` block, and every `.kdl` file in the themes folder (`theme_dir`, else `themes` beside the config; `ZELLIJ_CONFIG_DIR` and `ZELLIJ_CONFIG_FILE` are honoured). Both theme formats are read, the older palette and the component one. A built-in theme is compiled into Zellij, not on disk, so it answers `null`; a colour written as an 8-bit index is `null` on its own. The theme is read once per process.
 
 **The default is the absence of a multiplexer.** Every call has a defined answer then: `null`, or nothing for `close`. So a mod doesn't need special cases. It falls back where the answer is `null`:
 - **helper-desk** docks its pane;
@@ -34,7 +36,8 @@ A backend is pure: it builds command lines and reads their output, and `hooks/re
    - `detect(env)`;
    - `can` (what it supports; a `false` makes that call answer as with no multiplexer);
    - `floatingArgv`, `besideArgv`, `editArgv`, `listArgv` with `listed`, `closeArgv`;
-   - `paneFrom`, to read the new pane's id out of the command's output.
+   - `paneFrom`, to read the new pane's id out of the command's output;
+   - `theme`, optional, when the multiplexer keeps its theme in files: `dirs`, `file`, `plan` and `pick` (`ThemeBackend` in `hooks/backend.ts`; `hooks/zellij-theme.ts` is Zellij's).
 2. Add it to `BACKENDS` in `hooks/register.ts`, above Zellij if it should win when both are present.
 3. Read the environment variable its `detect` needs, by name, in `environment()` in `hooks/register.ts`. Claude Code lists the variables a mod reads, so each one is spelled out there.
 4. Test it the way `hooks/zellij.test.ts` tests Zellij, add a case to `hooks/register.test.ts`, and bump the version.

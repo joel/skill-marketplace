@@ -13,12 +13,12 @@ Marketplace name: `joel-skills`. Catalog: `.claude-plugin/marketplace.json`.
 | `plan-implementation` | Drives any piece of code work through a full lifecycle: size-scaled design pass, GitHub issue, Kanban, branch, implement, seed data, internal code and security review loops, validation gates, atomic commits, live verification in a real browser, docs and diagrams, PR, automated-reviewer loop, review-thread triage, merge per project policy, optional release, and persisting what was learned. Generic: each project supplies its own repo, board, commands, gates, reviewer bot, and merge policy through its workflow doc. |
 | `prompt-debias` | Rewrites a draft prompt before you send it so the answering model cannot silently inherit your frames. Models refute what you assert but inherit what you assume. The skill inventories every injected frame, keeps real constraints and evidence, quarantines the rest as hypotheses to test, states the question neutrally, and adds instructions that force competing framings and odds-backed conclusions. Returns the rewritten prompt plus a table of what changed. Inspired by [Techintrospect's AI Bullshit Fixer](https://techintrospect.substack.com/p/ai-bullshit-fixer-prompt). |
 | `joel-tone` | Rewrites drafts, emails, Slack messages, proposals, or LLM-generated copy into Joel's voice so they read like a careful human wrote them. Picks the register first (public Vogon Partners copy or Joel's own messages), then applies the hard rules: no em or en dashes, no invented facts, no empty intensifiers, no filled-template rhythm. Ships the public-website voice brief as a reference. Returns paste-ready text plus a short note on what changed and what to check. |
-| `helper-desk` | A Claude Code mod (a hooks module, not a skill) by [Ben AI](https://www.benai.co), redistributed with permission. A purple task bar above the prompt fills as Claude ticks off its plan, and the Helper Desk pane shows one live card per subagent: its current step, tokens, time and a progress bar. Registers a `plan` tool and `/helpers`, and adds a short system-prompt section plus plan nudges to every session while it is enabled. Built and tested on Claude Code 2.1.311 (upstream 0.4.0 needed 2.1.287 or newer). See [helper-desk 0.7.2](#helper-desk-072-2026-10-28). |
+| `helper-desk` | A Claude Code mod (a hooks module, not a skill) by [Ben AI](https://www.benai.co), redistributed with permission. A purple task bar above the prompt fills as Claude ticks off its plan, and the Helper Desk pane shows one live card per subagent: its current step, tokens, time and a progress bar. In Zellij, the pane and its floating window take the colours of your Zellij theme. Registers a `plan` tool and `/helpers`, and adds a short system-prompt section plus plan nudges to every session while it is enabled. Built and tested on Claude Code 2.1.311 (upstream 0.4.0 needed 2.1.287 or newer). See [helper-desk 0.8.0](#helper-desk-080-multiplexer-020-2026-10-28). |
 | `handoff` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. When a chat reaches 250k tokens (configurable), a Refresh row offers to move the work to a fresh chat. It writes a handoff of the whole chat (what was asked, decided and done, files to open, next steps) with one model call, saves a draft first, and keeps every handoff in `~/.claude/handoffs/`. Then it copies the handoff, or starts the new chat: in a Zellij pane beside this one, or in the desktop app. `/refresh` shows the row, `/handoff` writes one now. Pairs with cache-clock's "Hand off" button. See [handoff 0.2.0](#handoff-020-2026-10-27). |
 | `cache-clock` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. Counts down above the prompt until the chat's prompt cache goes cold (5 min or 1 hour, read from the chat's transcript), so you know when a reply is still cheap. Keep warm (`/keepwarm`) sends a tiny background ping before the cache expires. When a big chat goes cold, "Hand off to a fresh chat" runs the handoff mod, so install both. Fits narrow terminals and Zellij panes. See [cache-clock 0.7.1](#cache-clock-071-2026-10-28). |
 | `effort-optimizer` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. Before Claude starts on a prompt, one short model call reads it and picks the effort level it needs (low to max) with Ben's four-question framework. In `suggest` mode a question offers the switch; in `auto` mode it switches by itself. The level goes on this chat's requests only, never into your own effort setting, and the footer shows it (`Effort Low`). Settings in `/config`; `/effort-optimizer` shows the real level. See [effort-optimizer 0.2.1](#cache-clock-042-effort-optimizer-021-helper-desk-071-2026-10-28). |
 | `usage-left` | A Claude Code mod. One row above the prompt shows how much of your 7-day and 5-hour usage windows is left (`7D ●●●●●●···· 59% left · 3d 9h`), and when each resets. A window under 15% says LOW. It reads the figures Claude Code already has, so it costs no tokens, and it draws nothing when you use an API key rather than a subscription. On a narrow screen it drops the dot bars, then puts one window per row. Turn it off with `/plugin disable usage-left`. Idea from [ribbon](https://github.com/robonuggets/ribbon) (MIT). See [usage-left 0.1.1](#usage-left-011-2026-10-28). |
-| `multiplexer` | Not a mod you see: a plugin that gives mods one interface to terminal multiplexers (`$.mux`). helper-desk and handoff use it for floating windows, panes beside the chat and a floating editor, and Claude Code installs it with them. Zellij is supported. With no multiplexer, each call has a defined "none" answer and each mod falls back (see [Terminal multiplexers](#terminal-multiplexers)). tmux and others can be added as a backend. See [multiplexer 0.1.0](#multiplexer-010-2026-10-27). |
+| `multiplexer` | Not a mod you see: a plugin that gives mods one interface to terminal multiplexers (`$.mux`). helper-desk and handoff use it for floating windows, panes beside the chat, a floating editor and the multiplexer's theme colours, and Claude Code installs it with them. Zellij is supported. With no multiplexer, each call has a defined "none" answer and each mod falls back (see [Terminal multiplexers](#terminal-multiplexers)). tmux and others can be added as a backend. See [multiplexer 0.2.0](#helper-desk-080-multiplexer-020-2026-10-28). |
 
 ## Terminal multiplexers
 
@@ -29,9 +29,10 @@ helper-desk and handoff use the `multiplexer` plugin's `$.mux` interface. They n
 | helper-desk `/helpers float`, `pane: float` | a pinned window in the bottom right corner | the docked pane, and a line saying why |
 | handoff Start new chat | a pane beside the chat running `claude` on the handoff | the handoff copied, plus the command to run |
 | handoff Open file | your `$EDITOR` in a floating pane | `open` on a Mac, `xdg-open` elsewhere |
+| helper-desk pane and float colours | the Zellij theme's, read from its files | Claude Code's theme keys in the terminal, fixed colours in the app |
 
 - **tmux:** a chat inside tmux behaves as having no multiplexer until someone writes a tmux backend. `plugins/multiplexer/README.md` says how, with a sketch.
-- **The dependency is required.** A mod that depends on `multiplexer` doesn't load without it, and Claude Code names the missing plugin. When updating from helper-desk 0.6 or handoff 0.2, install it first with `claude plugin install multiplexer@joel-skills`, then update the mods.
+- **The dependency is required.** A mod that depends on `multiplexer` doesn't load without it, and Claude Code names the missing plugin. When updating from helper-desk 0.6 or handoff 0.2, install it first with `claude plugin install multiplexer@joel-skills`, then update the mods. helper-desk 0.8 takes the theme colours from multiplexer 0.2.0 or newer: with an older one the pane keeps Claude Code's theme keys, and nothing breaks.
 
 ## Installation (one-time, per machine)
 
@@ -85,6 +86,38 @@ allowed), and it is the only PR that bumps the version. A rename cannot land on
 forbids an entry without a directory.
 
 ## Release notes
+
+### helper-desk 0.8.0, multiplexer 0.2.0 (2026-10-28)
+
+In Zellij, the Helpers pane and its floating window now take their colours
+from your Zellij theme, whatever Claude Code's theme is. The multiplexer
+plugin reads the theme from Zellij's files and hands it to mods as
+`$.mux.theme()`; helper-desk draws with it the way Zellij does: the theme's
+orange for the header while helpers run, the live step and the tile values;
+its green, yellow and red for the Running, Finished and Stopped bars, with
+the theme's dark ink on them as on Zellij's ribbons; its colours for the
+step tags; and the eight pet colours become the theme's red, orange, yellow,
+green, cyan, blue, magenta and foreground, so cards still tell apart. If a
+colour then looks wrong, the theme file is the place to fix it.
+
+- **What is read.** `theme` in `config.kdl` (`theme_dark` and `theme_light`
+  when both are set, picked by Claude Code's own light or dark setting),
+  `theme_dir`, the config's own `themes {}` block, and every `.kdl` file in
+  the themes folder (`~/.config/zellij/themes` unless `theme_dir` says
+  otherwise; `ZELLIJ_CONFIG_DIR` and `ZELLIJ_CONFIG_FILE` are honoured).
+  Both theme formats are read: the older palette, and the component one of
+  Zellij 0.42 and later.
+- **What is not.** Zellij's built-in themes (`default`, `dracula`, ...) are
+  compiled into it, not on disk, so they answer nothing and the pane stays
+  on Claude Code's theme keys, as in 0.7.2. A colour written as an 8-bit
+  index (the `ansi` theme) keeps its key too, colour by colour. The theme
+  is read once per Claude Code process: a theme changed in Zellij shows
+  after a restart.
+- **Unchanged.** Plain and dim text (the terminal's own), the purple task
+  bar, and the desktop app.
+- **Update multiplexer first.** helper-desk 0.8.0 with an older multiplexer
+  keeps the 0.7.2 colours; nothing breaks.
+- Tested on Zellij 0.45.1 with a Tokyo Night theme file.
 
 ### helper-desk 0.7.2 (2026-10-28)
 
