@@ -1,5 +1,5 @@
 export type Clock = {
-  /** When the last main-chat reply ended, in ms. 0 before the first reply. */
+  /** When the last main-chat request started (the cache's timer starts there), in ms. 0 before the first reply. */
   lastEnd: number
   /** How long the cache stays warm after a reply, in ms. */
   ttlMs: number

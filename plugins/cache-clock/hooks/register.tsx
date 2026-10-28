@@ -43,6 +43,9 @@ let demo = false
 let detected: 'unknown' | '5m' | '1h' = 'unknown'
 let working = false
 let pinging = false
+// When this turn's last main-thread request started: the cache's hour or 5 minutes count from it,
+// not from the end of the reply. 0 until a step of this turn has been seen.
+let stepAt = 0
 
 // Hide (its button or /cacheclock hide) hides the clock in this chat; /cacheclock shows it.
 // Kept in $.state so a reload keeps it. A lasting "off" is /plugin disable cache-clock.
@@ -255,12 +258,16 @@ async function detect($: EngineInterface) {
   if (found !== 'unknown') detected = found
 }
 
-// A main-chat reply just ended: the cache is warm again from now.
+// A main-chat reply just ended: the cache is warm again from its last request, else from now.
 async function restart($: EngineInterface) {
+  // Read before any await: the next turn's start clears it.
+  const at = stepAt
+  stepAt = 0
   const now = await $.clock.now()
+  const lastEnd = at || now
   const { context } = await $.session.usage()
   await detect($).catch(() => undefined)
-  await setClock($, { lastEnd: now, ...ttl(), tokens: context.tokens ?? 0, now, note: '' })
+  await setClock($, { lastEnd, ...ttl(), tokens: context.tokens ?? 0, now, note: '' })
 }
 
 // Once a second: moves the countdown while the band shows.
@@ -338,7 +345,15 @@ export const register: Register = on => {
   on('turn.start', async ($, e, next) => {
     // Should the engine ever raise a turn for the ping's own fork, it is not the person's turn.
     if (!(pinging && e.text === PING_PROMPT)) working = true
+    // A subagent starting mid-turn must not wipe the main thread's stamp.
+    if (e.agentId === undefined) stepAt = 0
     return next(e)
+  })
+
+  // Each main-thread request reads or writes the cache, so the cache's timer starts at the request.
+  on('turn.step', async function* ($, e, next) {
+    if (e.agentId === undefined && !pinging) stepAt = await $.clock.now()
+    return yield* next(e)
   })
 
   on('turn.complete', async ($, e, next) => {
