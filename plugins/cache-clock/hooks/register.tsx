@@ -387,10 +387,12 @@ export const register: Register = on => {
   })
 
   on('turn.start', async ($, e, next) => {
+    // Only the main thread's turns count: a subagent's never ends in a main turn.complete, so it
+    // would leave the band hidden, and it does not touch the main chat's cache or its stamp.
+    if (e.agentId !== undefined) return next(e)
     // Should the engine ever raise a turn for the ping's own fork, it is not the person's turn.
     if (!(pinging && e.text === PING_PROMPT)) working = true
-    // A subagent starting mid-turn must not wipe the main thread's stamp.
-    if (e.agentId === undefined) stepAt = 0
+    stepAt = 0
     return next(e)
   })
 
