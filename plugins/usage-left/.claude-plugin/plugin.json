@@ -1,0 +1,16 @@
+{
+  "name": "usage-left",
+  "version": "0.1.0",
+  "description": "One row above the prompt: how much of your 7-day and 5-hour usage windows is left, and when each resets. LOW under 15%",
+  "author": {
+    "name": "Joel Azemar"
+  },
+  "types": "./types/index.d.ts",
+  "repository": "https://github.com/joel/skill-marketplace",
+  "keywords": [
+    "mod",
+    "usage",
+    "rate-limits",
+    "terminal"
+  ]
+}
