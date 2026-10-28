@@ -152,7 +152,7 @@
         "name": "Joel Azemar"
       },
       "category": "productivity",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/joel/skill-marketplace.git",
