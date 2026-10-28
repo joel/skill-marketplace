@@ -144,13 +144,13 @@ for (const surface of ['desktop', 'terminal'] as const) {
 
 test('the app spaces the band rows so its buttons do not sit on the text; the terminal does not', { timeoutMs: 30000 }, async ($, on) => {
   const { clock } = rig(on)
-  for (const [surface, gap] of [['desktop', 1], ['terminal', 0]] as const) {
+  for (const [surface, gap] of [['desktop', 'xs'], ['terminal', 0]] as const) {
     await $.session.start({ ...begin, surface } as never)
     await $.turn.complete({ answer: '' } as never)
     await clock.settle()
     for (const cols of [200, 80]) {
       const v = await $.ui.mount({ plugin: 'cache-clock', surface, component: 'AbovePrompt', props: band(cols) })
-      const b = (await v.find({ key: 'band' })) as { props: { gap?: number } } | undefined
+      const b = (await v.find({ key: 'band' })) as { props: { gap?: number | string } } | undefined
       expect(b?.props.gap, `${surface} at ${cols} columns`).toBe(gap)
     }
   }

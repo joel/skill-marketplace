@@ -1218,6 +1218,8 @@ export const register: Register = (on, options) => {
     if (!deskOn()) return next(e)
     const els = $.ui.resolve(e)
     const { Box, Text, Button } = els
+    // The app needs a gap between rows (its smallest step, as the other bands use); the terminal 0.
+    const rowGap = e.surface === 'terminal' ? 0 : 'xs'
     // Svg draws on desktop, the editor and mobile; the terminal gets a glyph.
     const Svg = e.surface !== 'terminal' && 'Svg' in els ? els.Svg : null
     const { value: list = [] } = await $.state.get(HELPERS)
@@ -1445,6 +1447,8 @@ export const register: Register = (on, options) => {
     const rest = drawn && typeof drawn === 'object' && (drawn as { type?: string }).type !== 'engine' ? drawn : null
     const els = $.ui.resolve(e)
     const { Box, Text, Button } = els
+    // The app needs a gap between rows (its smallest step, as the other bands use); the terminal 0.
+    const rowGap = e.surface === 'terminal' ? 0 : 'xs'
     const cols = typeof e.props.bodyColumns === 'number' && e.props.bodyColumns > 0 ? Math.floor(e.props.bodyColumns) : 0
     const n = p.steps.length
     const done = doneCount(p.steps)
@@ -1501,9 +1505,9 @@ export const register: Register = (on, options) => {
       )
     }
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" gap={rowGap}>
         {rest as never}
-        <Box key="plan-band" flexDirection="column">
+        <Box key="plan-band" flexDirection="column" gap={rowGap}>
           {row as never}
           {line ? (
             <Text key="plan-now" dimColor wrap="truncate-end">

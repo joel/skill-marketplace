@@ -455,8 +455,13 @@ export const register: Register = (on, options) => {
     if (!enabled() || e.props.hasSurvey) return next(e)
     const b = await getBand($)
     if (!b) return next(e)
-    const rest = await next(e)
+    // Claude Code's own placeholder draws nothing but would take a gap above the band.
+    const drawn = await next(e)
+    const rest = drawn && typeof drawn === 'object' && (drawn as { type?: string }).type !== 'engine' ? drawn : null
     const { Box, Text, Button } = $.ui.resolve(e)
+    // The app draws buttons taller than a line of text, so its rows need a gap or the buttons
+    // sit on the line above: its smallest step, the same between every row. The terminal keeps 0.
+    const rowGap = e.surface === 'terminal' ? 0 : 'xs'
     const noop = () => undefined
     const glyph = infoGlyph(e.surface)
     const cols = typeof e.props.bodyColumns === 'number' && e.props.bodyColumns > 0 ? Math.floor(e.props.bodyColumns) : 0
@@ -481,8 +486,8 @@ export const register: Register = (on, options) => {
       // One row when the line and its button fit; else the line, cut, above the button.
       if (fits(line.length + learn.length + 5)) {
         return (
-          <Box flexDirection="column">
-            {rest}
+          <Box flexDirection="column" gap={rowGap}>
+            {rest as never}
             <Box flexDirection="row" gap={1}>
               {text}
               {button}
@@ -491,8 +496,8 @@ export const register: Register = (on, options) => {
         )
       }
       return (
-        <Box flexDirection="column">
-          {rest}
+        <Box flexDirection="column" gap={rowGap}>
+          {rest as never}
           {fit(text)}
           {short ? null : <Box flexDirection="row">{button}</Box>}
         </Box>
@@ -503,9 +508,9 @@ export const register: Register = (on, options) => {
       const lines = infoLines(b.level, b.from, e.surface)
       const shown = short ? [] : lines
       return (
-        <Box flexDirection="column">
-          {rest}
-          <Box flexDirection="column">
+        <Box flexDirection="column" gap={rowGap}>
+          {rest as never}
+          <Box flexDirection="column" gap={rowGap}>
             {fit(
               <Text wrap="truncate-end">
                 <Text color={ACCENT}>{glyph}</Text>
@@ -534,9 +539,9 @@ export const register: Register = (on, options) => {
     const au = <Button key="auto" label="Auto-adjust every prompt" variant="secondary" onPress={noop} />
     const sk = <Button key="skip" label="Skip" role="dismiss" onPress={noop} />
     return (
-      <Box flexDirection="column">
-        {rest}
-        <Box flexDirection="column">
+      <Box flexDirection="column" gap={rowGap}>
+        {rest as never}
+        <Box flexDirection="column" gap={rowGap}>
           {fit(
             <Text wrap="truncate-end">
               <Text color={ACCENT}>●</Text>
@@ -552,7 +557,7 @@ export const register: Register = (on, options) => {
               {sk}
             </Box>
           ) : (
-            <Box flexDirection="column">
+            <Box flexDirection="column" gap={rowGap}>
               <Box flexDirection="row" gap={1}>
                 {sw}
                 {sk}

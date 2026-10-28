@@ -410,7 +410,9 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const c = await getClock($)
     if (hidden || !c || !c.lastEnd || working || e.props.isWorking || e.props.hasSurvey) return next(e)
-    const rest = await next(e)
+    // Claude Code's own placeholder draws nothing but would take a gap above the band.
+    const drawn = await next(e)
+    const rest = drawn && typeof drawn === 'object' && (drawn as { type?: string }).type !== 'engine' ? drawn : null
     const { Box, Text, Button } = $.ui.resolve(e)
     const noop = () => undefined
     const left = c.lastEnd + c.ttlMs - c.now
@@ -439,8 +441,9 @@ export const register: Register = on => {
     const tip = roomy && (!narrow || w) ? <Text dimColor wrap={narrow ? 'truncate-end' : undefined}>{TIP}</Text> : null
     const fit = (node: unknown) => (narrow ? <Box width={cols}>{node as never}</Box> : node) as never
     // The app draws buttons taller than a line of text, so its rows need a gap or the buttons
-    // sit on the line above. A terminal row is one cell high and the band is short of rows there.
-    const rowGap = e.surface === 'terminal' ? 0 : 1
+    // sit on the line above: its smallest step, the same between every row. A terminal row is
+    // one cell high and the band is short of rows there.
+    const rowGap = e.surface === 'terminal' ? 0 : 'xs'
 
     if (left > 0) {
       const share = left / c.ttlMs
@@ -470,7 +473,7 @@ export const register: Register = on => {
       if (narrow) {
         return (
           <Box key="band" flexDirection="column" gap={rowGap}>
-            {rest}
+            {rest as never}
             {fit(clock)}
             {roomy ? fit(<Text dimColor wrap="truncate-end">{`Reply now and ${cost} cost 5 to 10% as much.`}</Text>) : null}
             {buttons}
@@ -481,7 +484,7 @@ export const register: Register = on => {
       }
       return (
         <Box key="band" flexDirection="column" gap={rowGap}>
-          {rest}
+          {rest as never}
           <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
             {clock}
             {buttons}
@@ -504,7 +507,7 @@ export const register: Register = on => {
     if (narrow) {
       return (
         <Box key="band" flexDirection="column" gap={rowGap}>
-          {rest}
+          {rest as never}
           {fit(
             <Text wrap="truncate-end">
               <Text color={COLD}>❄ Cache cold</Text>
@@ -521,7 +524,7 @@ export const register: Register = on => {
     }
     return (
       <Box key="band" flexDirection="column" gap={rowGap}>
-        {rest}
+        {rest as never}
         <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
           <Text>
             <Text color={COLD}>❄ Cache cold</Text>
