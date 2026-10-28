@@ -144,6 +144,21 @@
         "path": "plugins/multiplexer",
         "ref": "main"
       }
+    },
+    {
+      "name": "usage-left",
+      "description": "One row above the prompt: how much of your 7-day and 5-hour usage windows is left, and when each resets. LOW under 15%. Reads the engine's own figures, so it costs no tokens; draws nothing off a subscription",
+      "author": {
+        "name": "Joel Azemar"
+      },
+      "category": "productivity",
+      "version": "0.1.0",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/joel/skill-marketplace.git",
+        "path": "plugins/usage-left",
+        "ref": "main"
+      }
     }
   ]
 }
