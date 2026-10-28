@@ -1,5 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
+import { coldUsd, usd, warmUsd } from './price'
 import { ttlFromTail } from './ttl'
 
 /** The `on` a test body is handed. */
@@ -199,6 +200,40 @@ for (const source of ['clear', 'compact'] as const) {
     expect(await v.find({ text: /Cache\ warm/ }), 'back after a reply').toBeDefined()
   })
 }
+
+/** Rounded to a hundredth of a cent, so float noise does not fail the test. */
+const r4 = (n: number | null) => (n === null ? null : Math.round(n * 10_000) / 10_000)
+
+test('prices: a cache read while warm, a 1.25x or 2x write once cold, nothing for an unlisted model', () => {
+  expect(r4(warmUsd('claude-opus-5-5', 182_000))).toBe(0.0364)
+  expect(r4(coldUsd('claude-opus-5-5', 182_000, 5 * 60_000))).toBe(0.91)
+  expect(r4(coldUsd('claude-opus-5-5[1m]', 182_000, 60 * 60_000)), '1 hour cache, long-context id').toBe(1.456)
+  expect(r4(coldUsd('claude-fable-5-1', 1_000_000, 60 * 60_000))).toBe(20)
+  expect(r4(warmUsd('claude-haiku-5-5', 50_000)), 'Haiku under 100K').toBe(0.0005)
+  expect(r4(coldUsd('claude-haiku-5-5', 200_000, 5 * 60_000)), 'Haiku over 100K').toBe(0.125)
+  expect(warmUsd('claude-opus-5', 182_000), 'an older model is not priced').toBeNull()
+  expect(warmUsd('claude-opus-5-5', 0), 'no tokens, no price').toBeNull()
+  expect(usd(0.0036)).toBe('under $0.01')
+  expect(usd(0.91)).toBe('$0.91')
+})
+
+test('a priced model shows dollars, warm then cold', { timeoutMs: 30000 }, async ($, on) => {
+  const { clock } = rig(on)
+  on('session.model', async () => ({ value: 'claude-opus-5-5' }) as never)
+  await $.session.start({ ...begin, surface: 'terminal' } as never)
+  await $.turn.complete({ answer: '' } as never)
+  await clock.settle()
+  let v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band() })
+  expect(await v.find({ text: /182k tokens cost about \$0\.04, not \$0\.91/ }), 'warm').toBeDefined()
+  await clock.advance(6 * 60_000)
+  v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band() })
+  expect(await v.find({ text: /re-reads 182k tokens at full cost \(about \$0\.91\)/ }), 'cold').toBeDefined()
+
+  // After a resume the engine's estimate is the full price on both lines.
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: 60, context_tokens: 182_000, estimated_cache_write_usd: 1.5, model: 'claude-opus-5-5', transcript_path: TRANSCRIPT } as never)
+  v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band() })
+  expect(await v.find({ text: /cost about \$0\.04, not \$1\.50/ }), 'warm uses the engine estimate').toBeDefined()
+})
 
 test('the app spaces the band rows so its buttons do not sit on the text; the terminal does not', { timeoutMs: 30000 }, async ($, on) => {
   const { clock } = rig(on)

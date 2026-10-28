@@ -15,7 +15,7 @@ Marketplace name: `joel-skills`. Catalog: `.claude-plugin/marketplace.json`.
 | `joel-tone` | Rewrites drafts, emails, Slack messages, proposals, or LLM-generated copy into Joel's voice so they read like a careful human wrote them. Picks the register first (public Vogon Partners copy or Joel's own messages), then applies the hard rules: no em or en dashes, no invented facts, no empty intensifiers, no filled-template rhythm. Ships the public-website voice brief as a reference. Returns paste-ready text plus a short note on what changed and what to check. |
 | `helper-desk` | A Claude Code mod (a hooks module, not a skill) by [Ben AI](https://www.benai.co), redistributed with permission. A purple task bar above the prompt fills as Claude ticks off its plan, and the Helper Desk pane shows one live card per subagent: its current step, tokens, time and a progress bar. Registers a `plan` tool and `/helpers`, and adds a short system-prompt section plus plan nudges to every session while it is enabled. Built and tested on Claude Code 2.1.311 (upstream 0.4.0 needed 2.1.287 or newer). See [helper-desk 0.7.1](#cache-clock-042-effort-optimizer-021-helper-desk-071-2026-10-28). |
 | `handoff` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. When a chat reaches 250k tokens (configurable), a Refresh row offers to move the work to a fresh chat. It writes a handoff of the whole chat (what was asked, decided and done, files to open, next steps) with one model call, saves a draft first, and keeps every handoff in `~/.claude/handoffs/`. Then it copies the handoff, or starts the new chat: in a Zellij pane beside this one, or in the desktop app. `/refresh` shows the row, `/handoff` writes one now. Pairs with cache-clock's "Hand off" button. See [handoff 0.2.0](#handoff-020-2026-10-27). |
-| `cache-clock` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. Counts down above the prompt until the chat's prompt cache goes cold (5 min or 1 hour, read from the chat's transcript), so you know when a reply is still cheap. Keep warm (`/keepwarm`) sends a tiny background ping before the cache expires. When a big chat goes cold, "Hand off to a fresh chat" runs the handoff mod, so install both. Fits narrow terminals and Zellij panes. See [cache-clock 0.6.0](#cache-clock-060-2026-10-28). |
+| `cache-clock` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. Counts down above the prompt until the chat's prompt cache goes cold (5 min or 1 hour, read from the chat's transcript), so you know when a reply is still cheap. Keep warm (`/keepwarm`) sends a tiny background ping before the cache expires. When a big chat goes cold, "Hand off to a fresh chat" runs the handoff mod, so install both. Fits narrow terminals and Zellij panes. See [cache-clock 0.7.0](#cache-clock-070-2026-10-28). |
 | `effort-optimizer` | A Claude Code mod by [Ben AI](https://www.benai.co), redistributed with permission. Before Claude starts on a prompt, one short model call reads it and picks the effort level it needs (low to max) with Ben's four-question framework. In `suggest` mode a question offers the switch; in `auto` mode it switches by itself. The level goes on this chat's requests only, never into your own effort setting, and the footer shows it (`Effort Low`). Settings in `/config`; `/effort-optimizer` shows the real level. See [effort-optimizer 0.2.1](#cache-clock-042-effort-optimizer-021-helper-desk-071-2026-10-28). |
 | `usage-left` | A Claude Code mod. One row above the prompt shows how much of your 7-day and 5-hour usage windows is left (`7D ●●●●●●···· 59% left · 3d 9h`), and when each resets. A window under 15% says LOW. It reads the figures Claude Code already has, so it costs no tokens, and it draws nothing when you use an API key rather than a subscription. On a narrow screen it drops the dot bars, then puts one window per row. Turn it off with `/plugin disable usage-left`. Idea from [ribbon](https://github.com/robonuggets/ribbon) (MIT). See [usage-left 0.1.0](#usage-left-010-2026-10-28). |
 | `multiplexer` | Not a mod you see: a plugin that gives mods one interface to terminal multiplexers (`$.mux`). helper-desk and handoff use it for floating windows, panes beside the chat and a floating editor, and Claude Code installs it with them. Zellij is supported. With no multiplexer, each call has a defined "none" answer and each mod falls back (see [Terminal multiplexers](#terminal-multiplexers)). tmux and others can be added as a backend. See [multiplexer 0.1.0](#multiplexer-010-2026-10-27). |
@@ -85,6 +85,21 @@ allowed), and it is the only PR that bumps the version. A rename cannot land on
 forbids an entry without a directory.
 
 ## Release notes
+
+### cache-clock 0.7.0 (2026-10-28)
+
+The band now says what the next message's prompt costs, in dollars:
+"Reply now and 182k tokens cost about $0.04, not $0.91" while the cache is
+warm, and "at full cost (about $0.91)" once it is cold. The cold price
+follows the cache length the clock detects: a 5 minute cache costs 1.25
+times the input price to write again, and a 1 hour cache 2 times.
+
+- **Priced models:** Fable 5.1, Mythos 5.1, Opus 5.5, Sonnet 5.5 and
+  Haiku 5.5, at list price. Any other model keeps the token wording.
+- **The price covers the prompt only**, not Claude's reply.
+- **Prices live in `plugins/cache-clock/hooks/price.ts`.** Edit that table
+  when Anthropic changes them. After a resume, Claude Code's own estimate is
+  used instead.
 
 ### cache-clock 0.6.0 (2026-10-28)
 

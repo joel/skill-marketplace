@@ -1,6 +1,7 @@
 import type { EngineInterface, ModelForkResult, Register } from 'claude-code'
 
 import type { Clock, Warm } from '../types'
+import { coldUsd, usd, warmUsd } from './price'
 import { TAIL_BYTES, ttlFromTail } from './ttl'
 
 const CLOCK = { plugin: 'cache-clock', key: 'clock' } as const
@@ -71,8 +72,18 @@ async function setHidden($: EngineInterface, value: boolean) {
 }
 
 const short = (tokens: number) => `${Math.round(tokens / 1000)}k`
-/** "at full cost", with the engine's price when it gave one (after a resume). */
-const fullCost = (c: Clock) => (c.usd ? `at full cost (about $${c.usd.toFixed(2)})` : 'at full cost')
+/** "at full cost", with a price: the engine's after a resume, else the price table's. */
+const coldPrice = (c: Clock) => c.usd ?? coldUsd(c.model ?? '', c.tokens, c.ttlMs)
+function fullCost(c: Clock) {
+  const n = coldPrice(c)
+  return n === null ? 'at full cost' : `at full cost (about ${usd(n)})`
+}
+/** What replying while warm costs, priced when the model is. */
+function warmCost(c: Clock, cost: string) {
+  const warm = warmUsd(c.model ?? '', c.tokens)
+  const cold = coldPrice(c)
+  return warm === null || cold === null ? `${cost} cost 5 to 10% as much` : `${cost} cost about ${usd(warm)}, not ${usd(cold)}`
+}
 const mmss = (ms: number) => {
   const s = Math.max(0, Math.ceil(ms / 1000))
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
@@ -268,8 +279,9 @@ async function restart($: EngineInterface) {
   const now = await $.clock.now()
   const lastEnd = at || now
   const { context } = await $.session.usage()
+  const model = await $.session.model().catch(() => '')
   await detect($).catch(() => undefined)
-  await setClock($, { lastEnd, ...ttl(), tokens: context.tokens ?? 0, now, note: '' })
+  await setClock($, { lastEnd, ...ttl(), tokens: context.tokens ?? 0, now, note: '', ...(model ? { model } : {}) })
 }
 
 // Once a second: moves the countdown while the band shows.
@@ -353,14 +365,15 @@ export const register: Register = on => {
     if ((e.source === 'resume' || e.source === 'fork') && typeof e.seconds_since_last_response === 'number') {
       await detect($).catch(() => undefined)
       const now = await $.clock.now()
-      const usd = e.estimated_cache_write_usd
+      const estimate = e.estimated_cache_write_usd
       await setClock($, {
         lastEnd: now - e.seconds_since_last_response * 1000,
         ...ttl(),
         tokens: e.context_tokens ?? 0,
         now,
         note: '',
-        ...(typeof usd === 'number' && usd > 0 ? { usd } : {}),
+        ...(typeof estimate === 'number' && estimate > 0 ? { usd: estimate } : {}),
+        ...(typeof e.model === 'string' && e.model ? { model: e.model } : {}),
       })
     }
     $.ui.invalidate('ui.render')
@@ -473,7 +486,7 @@ export const register: Register = on => {
     const buttonsW = labels.reduce((n, l) => n + l.length + 5, 0)
     const oneRow =
       left > 0
-        ? `◷ Cache warm ${mmss(left)} ${'━'.repeat(BAR)} ${lengthLabel(c)}. Reply now and ${cost} cost 5 to 10% as much.`
+        ? `◷ Cache warm ${mmss(left)} ${'━'.repeat(BAR)} ${lengthLabel(c)}. Reply now and ${warmCost(c, cost)}.`
         : `❄ Cache cold since ${ago(-left)}. Your next message re-reads ${cost} ${fullCost(c)}.`
     // The engine keeps the last few columns for its own [-] control.
     const narrow = cols > 0 && cols < oneRow.length + buttonsW + 6
@@ -507,7 +520,7 @@ export const register: Register = on => {
           <Text color={color}>{'━'.repeat(filled)}</Text>
           <Text dimColor>{'━'.repeat(bar - filled)}</Text>
           {narrow ? <Text dimColor>{`  ${shortLabel(c)}`}</Text> : <Text dimColor>{` ${lengthLabel(c)}.`}</Text>}
-          {narrow ? null : <Text dimColor> Reply now and {cost} cost 5 to 10% as much.</Text>}
+          {narrow ? null : <Text dimColor> Reply now and {warmCost(c, cost)}.</Text>}
         </Text>
       )
       const buttons = (
@@ -521,7 +534,7 @@ export const register: Register = on => {
           <Box key="band" flexDirection="column" gap={rowGap}>
             {rest as never}
             {fit(clock)}
-            {roomy ? fit(<Text dimColor wrap="truncate-end">{`Reply now and ${cost} cost 5 to 10% as much.`}</Text>) : null}
+            {roomy ? fit(<Text dimColor wrap="truncate-end">{`Reply now and ${warmCost(c, cost)}.`}</Text>) : null}
             {buttons}
             {warmRow ? fit(warmRow) : null}
             {tip ? fit(tip) : null}
