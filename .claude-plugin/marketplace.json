@@ -74,7 +74,7 @@
         "url": "https://www.benai.co"
       },
       "category": "productivity",
-      "version": "0.7.2",
+      "version": "0.8.0",
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/joel/skill-marketplace.git",
@@ -132,12 +132,12 @@
     },
     {
       "name": "multiplexer",
-      "description": "One interface for terminal multiplexers ($.mux): floating panes, panes beside the chat, a floating editor. Zellij is supported; with none, every call answers null so each mod falls back on its own. Other multiplexers (tmux) plug in as a backend",
+      "description": "One interface for terminal multiplexers ($.mux): floating panes, panes beside the chat, a floating editor, and the active theme's colours. Zellij is supported; with none, every call answers null so each mod falls back on its own. Other multiplexers (tmux) plug in as a backend",
       "author": {
         "name": "Joel Azemar"
       },
       "category": "productivity",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/joel/skill-marketplace.git",

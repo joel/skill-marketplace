@@ -1,7 +1,7 @@
 {
   "name": "multiplexer",
-  "version": "0.1.0",
-  "description": "One interface for terminal multiplexers ($.mux): floating panes, panes beside the chat, a floating editor. Zellij is supported; with none, every call answers null so each mod falls back on its own. Other multiplexers (tmux) plug in as a backend",
+  "version": "0.2.0",
+  "description": "One interface for terminal multiplexers ($.mux): floating panes, panes beside the chat, a floating editor, and the active theme's colours. Zellij is supported; with none, every call answers null so each mod falls back on its own. Other multiplexers (tmux) plug in as a backend",
   "author": {
     "name": "Joel Azemar"
   },

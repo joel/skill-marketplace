@@ -31,3 +31,9 @@ Changes in 0.7.2:
 - On the terminal, the Helpers pane uses Claude Code's theme keys instead
   of fixed hex colours, so it follows an ANSI theme (and so the terminal's
   palette). The app keeps the original colours.
+
+Changes in 0.8.0:
+- In a terminal multiplexer with a theme on disk (Zellij), the Helpers pane
+  and the floating window take the theme's colours through $.mux.theme():
+  the accent, status and group colours, the step tags, and the eight pet
+  colours. With no theme the 0.7.2 behaviour stays. The app is unchanged.

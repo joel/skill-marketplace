@@ -46,6 +46,29 @@ export type MuxPaneArgs = {
   pane: MuxPane
 }
 
+/**
+ * The 11 colours of a multiplexer's theme (Zellij's palette), each "#rrggbb" in lower case, or
+ * null when the theme gives none a mod can use: an 8-bit terminal index, a colour left out.
+ */
+export type MuxPalette = {
+  fg: string | null
+  bg: string | null
+  black: string | null
+  red: string | null
+  green: string | null
+  yellow: string | null
+  blue: string | null
+  magenta: string | null
+  cyan: string | null
+  white: string | null
+  orange: string | null
+}
+
+/** The active theme: its name as the multiplexer's config names it ("tokyo-night"), and its colours. */
+export type MuxTheme = MuxPalette & {
+  name: string
+}
+
 export type Mux = {
   /** The multiplexer this chat runs in, or null: none, or one with no backend yet. */
   info: () => Promise<MuxInfo | null>
@@ -59,6 +82,11 @@ export type Mux = {
   isOpen: (a: MuxPaneArgs) => Promise<boolean | null>
   /** Closes the pane; quiet when it is already gone. */
   close: (a: MuxPaneArgs) => Promise<void>
+  /**
+   * The active theme's colours; null with no multiplexer, one that keeps no theme on disk, or a
+   * theme the backend cannot read (a built-in one, a name nothing defines). Read once a process.
+   */
+  theme: () => Promise<MuxTheme | null>
 }
 
 declare module 'claude-code' {

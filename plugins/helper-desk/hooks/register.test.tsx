@@ -13,13 +13,14 @@ const fakeMux = {
   register(on: On) {
     on('engine.create', async ($, e, next) => ({
       ...(await next(e)),
-      mux: { info: async () => null, openFloating: async () => null, openBeside: async () => null, edit: async () => null, isOpen: async () => null, close: async () => undefined },
+      mux: { info: async () => null, openFloating: async () => null, openBeside: async () => null, edit: async () => null, isOpen: async () => null, close: async () => undefined, theme: async () => null },
     }))
     const ask = async (out: { stdout: string }) => ({ value: JSON.parse(out.stdout || 'null') })
     on('mux.info', async $ => ask(await $.process.run(['fake-mux', 'info', '{}'])))
     on('mux.openFloating', async ($, e) => ask(await $.process.run(['fake-mux', 'openFloating', JSON.stringify(e)])))
     on('mux.isOpen', async ($, e) => ask(await $.process.run(['fake-mux', 'isOpen', JSON.stringify(e)])))
     on('mux.close', async ($, e) => ask(await $.process.run(['fake-mux', 'close', JSON.stringify(e)])))
+    on('mux.theme', async $ => ask(await $.process.run(['fake-mux', 'theme', '{}'])))
   },
 }
 
@@ -31,6 +32,12 @@ const keyOf = (files: Record<string, string>, path: string) =>
 
 /** Each tool spec the mod registered, newest test only. */
 let specs: { isDeferred?: boolean }[] = []
+
+/** The theme the stand-in multiplexer answers; a test sets it after `rig`, before the session starts. */
+let fakeTheme: Record<string, string | null> | null = null
+
+/** A Zellij theme (Tokyo Night) as $.mux.theme() answers it. */
+const TOKYO = { name: 'tokyo-night', fg: '#a9b1d6', bg: '#1a1b26', black: '#383e5a', red: '#f93357', green: '#9ece6a', yellow: '#e0af68', blue: '#7aa2f7', magenta: '#bb9af7', cyan: '#2ac3de', white: '#c0caf5', orange: '#ff9e64' }
 
 /**
  * Mocks every $ call the mod makes; `files` stands in for the disk, `env` adds variables beside
@@ -45,6 +52,7 @@ function rig(on: On, files: Record<string, string>, env: Record<string, string> 
   const closed: string[] = []
   const ran: string[][] = []
   const toasts: string[] = []
+  fakeTheme = null
 
   on('session.start', async ($, e) => ({ cwd: e.cwd }) as never)
   on('session.id', async () => ({ value: 'sess1' }) as never)
@@ -124,6 +132,7 @@ function rig(on: On, files: Record<string, string>, env: Record<string, string> 
       }
       if (argv[1] === 'isOpen') value = cannotTell ? null : panes.has(arg.pane?.id ?? '')
       if (argv[1] === 'close') panes.delete(arg.pane?.id ?? '')
+      if (argv[1] === 'theme') value = fakeTheme
       stdout = JSON.stringify(value)
     }
     return { value: { exitCode: 0, stdout, stderr: '' } } as never
@@ -757,4 +766,89 @@ test('a multiplexer that cannot tell whether the float is open never gets a seco
   const r = await $.command.run({ command: 'helpers', args: 'float' } as never)
   expect(String((r as { text?: string }).text), 'closed').toContain('float closed')
   expect(floats(ran), 'one float in all').toHaveLength(1)
+})
+
+test('in a multiplexer with a theme, the pane and the float take its colours', { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
+  const files: Record<string, string> = {}
+  const { clock } = rig(on, files, ZELLIJ)
+  fakeTheme = TOKYO
+  await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface: 'terminal', isInteractive: true } as never)
+  const callTool = $.tool.call as unknown as (input: unknown) => Promise<unknown>
+  await spawn($, 'Read the research notes', 's1')
+  await spawn($, 'Find invoice threads', 's2')
+  await clock.settle()
+  await callTool({ tool: 'Read', tool_use_id: 'c1', file_path: '/Users/test/vault/research.md', agentId: 'agent-a1' } as never)
+  await callTool({ tool: 'Bash', tool_use_id: 'c2', command: 'ls', description: 'List files', agentId: 'agent-a1' } as never)
+  await clock.advance(1_000)
+
+  const v = await $.ui.mount({ plugin: 'helper-desk', surface: 'terminal', component: 'Pane', requestId: 'helpers', props: props(70) })
+  expect((await v.find({ key: 'head-running' }))?.props.backgroundColor, 'Running bar in the theme green').toBe('#9ece6a')
+  expect((await v.find({ type: 'Text', text: /^Running · 2\s*$/ }))?.props.color, 'dark ink on the bar, as a Zellij ribbon').toBe('#383e5a')
+  expect((await v.find({ type: 'Text', text: /2 subagents in this chat/ }))?.props.color, 'header in the theme orange').toBe('#ff9e64')
+  expect((await v.find({ type: 'Text', text: /^Step 2 · / }))?.props.color, 'live step in the theme orange').toBe('#ff9e64')
+  const pets = await v.findAll({ type: 'Text', text: /^ (▟█▙|▜█▛)$/ })
+  expect(pets.map(pet => pet.props.color), 'pets in the theme red and orange').toEqual(['#f93357', '#ff9e64'])
+  await v.press({ key: 'steps-agent-a1' })
+  expect((await v.find({ type: 'Text', text: /^File read$/ }))?.props.color, 'File read tag in the theme green').toBe('#9ece6a')
+  expect((await v.find({ type: 'Text', text: /^Command$/ }))?.props.color, 'Command tag in the theme yellow').toBe('#e0af68')
+
+  await $.turn.complete({ answer: 'ok', agentId: 'agent-a1', reason: 'answer', durationMs: 1, isAborted: false, turnId: 't1' } as never)
+  await $.turn.complete({ answer: '', agentId: 'agent-a2', reason: 'error', durationMs: 1, isAborted: false, turnId: 't2' } as never)
+  await clock.settle()
+  expect((await v.find({ key: 'head-finished' }))?.props.backgroundColor, 'Finished bar in the theme yellow').toBe('#e0af68')
+  expect((await v.find({ type: 'Text', text: /^Finished · 1\s*$/ }))?.props.color, 'dark ink on Finished too').toBe('#383e5a')
+  expect((await v.find({ key: 'head-stopped' }))?.props.backgroundColor, 'Stopped bar in the theme red').toBe('#f93357')
+
+  await $.command.run({ command: 'helpers', args: 'float' } as never)
+  const frame = files[FRAME] ?? ''
+  expect(frame, 'the float: the count in the theme green').toContain('38;2;158;206;106')
+  expect(frame, 'the float: Finished in the theme yellow').toContain('38;2;224;175;104')
+  expect(frame, 'the float: Stopped in the theme red').toContain('38;2;249;51;87')
+  expect(frame.includes('38;2;22;163;74') || frame.includes('38;2;220;38;38'), 'none of the fixed colours left').toBe(false)
+})
+
+test('in the desktop app a multiplexer theme changes nothing', { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
+  const { clock } = rig(on, {}, ZELLIJ)
+  fakeTheme = TOKYO
+  await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface: 'desktop', isInteractive: true } as never)
+  await spawn($, 'Build the landing page', 's1')
+  await clock.settle()
+  const v = await $.ui.mount({ plugin: 'helper-desk', surface: 'desktop', component: 'Pane', requestId: 'helpers', props: props() })
+  expect((await v.find({ key: 'head-running' }))?.props.backgroundColor, 'Running bar in the fixed green').toBe('#16a34a')
+  const pet = (await v.findAll({ type: 'Svg' })).find(p => String(p.props.alt).startsWith('Claude crab'))
+  expect(String(pet?.props.source).includes('#dc2626'), 'the pet in the fixed red').toBe(true)
+})
+
+test('a colour the theme lacks falls back to the theme key, the others stay the theme\'s', { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
+  const { clock } = rig(on, {}, ZELLIJ)
+  fakeTheme = { ...TOKYO, green: null }
+  await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface: 'terminal', isInteractive: true } as never)
+  await spawn($, 'Build the landing page', 's1')
+  await spawn($, 'Design the graphics', 's2')
+  await clock.settle()
+  await $.turn.complete({ answer: 'ok', agentId: 'agent-a1', reason: 'answer', durationMs: 1, isAborted: false, turnId: 't1' } as never)
+  await clock.settle()
+  const v = await $.ui.mount({ plugin: 'helper-desk', surface: 'terminal', component: 'Pane', requestId: 'helpers', props: props() })
+  expect((await v.find({ key: 'head-running' }))?.props.backgroundColor, 'no green in the theme: the key').toBe('success')
+  expect((await v.find({ key: 'head-finished' }))?.props.backgroundColor, 'the theme yellow').toBe('#e0af68')
+})
+
+// A multiplexer plugin from before $.mux.theme: the call is not there at all.
+const oldMux = {
+  name: 'multiplexer',
+  register(on: On) {
+    on('engine.create', async ($, e, next) => ({
+      ...(await next(e)),
+      mux: { info: async () => null, openFloating: async () => null, openBeside: async () => null, edit: async () => null, isOpen: async () => null, close: async () => undefined } as never,
+    }))
+  },
+}
+
+test('a multiplexer plugin without $.mux.theme leaves the pane as it was', { plugins: [oldMux], timeoutMs: 30000 }, async ($, on) => {
+  const { clock } = rig(on, {})
+  await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface: 'terminal', isInteractive: true } as never)
+  await spawn($, 'Build the landing page', 's1')
+  await clock.settle()
+  const v = await $.ui.mount({ plugin: 'helper-desk', surface: 'terminal', component: 'Pane', requestId: 'helpers', props: props() })
+  expect((await v.find({ key: 'head-running' }))?.props.backgroundColor, 'the theme key').toBe('success')
 })

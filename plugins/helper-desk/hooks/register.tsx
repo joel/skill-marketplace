@@ -3,7 +3,7 @@ import type { EngineInterface, Register, RenderSurface } from 'claude-code'
 import type { BandPlan, Helper, HelperPhase, PlanStatus, Step, StepKind } from '../types'
 import { connectorName, splitTool } from './connectors'
 import { ENDED, FLOAT_COLS, FLOAT_REFIT_MS, type FloatPane, floatFrame, floatSpec } from './float'
-import { HUES, clockTime, cut, hueOf, tokenText } from './text'
+import { HUES, type MuxTheme, clockTime, cut, hueOf, tokenText } from './text'
 
 const NAME = 'helper-desk'
 const PANE = 'helpers'
@@ -36,11 +36,26 @@ const BAD = '#dc2626'
 const WARN = '#eab308'
 const INK = '#1c1917'
 // The task bar is a purple gradient, light at the start and deep at the head (after Johnny's Savvy Progress).
-// The pane's colours. The terminal takes Claude Code's theme keys, so an ANSI theme draws the
-// pane in the terminal's own palette (a Zellij theme, say); the app keeps its fixed look.
-const PANE_HEX = { accent: ACCENT, good: GOOD, bad: BAD, warn: WARN, on: '#ffffff', onWarn: INK }
-const PANE_THEME = { accent: 'claude', good: 'success', bad: 'error', warn: 'warning', on: 'inverseText', onWarn: 'inverseText' }
-const paneColors = (surface: RenderSurface) => (surface === 'terminal' ? PANE_THEME : PANE_HEX)
+// The pane's colours. The terminal takes the multiplexer's theme when it has one (a Zellij
+// theme, read from its files), as Zellij uses its colours: orange for emphasis, dark ink on a
+// filled bar as on its ribbons. A colour the theme lacks, or no theme at all, falls back to
+// Claude Code's theme key, so an ANSI theme still draws in the terminal's palette. The app keeps
+// its fixed look.
+type PaneColors = { accent: string; good: string; bad: string; warn: string; on: string; onWarn: string }
+const PANE_HEX: PaneColors = { accent: ACCENT, good: GOOD, bad: BAD, warn: WARN, on: '#ffffff', onWarn: INK }
+const PANE_THEME: PaneColors = { accent: 'claude', good: 'success', bad: 'error', warn: 'warning', on: 'inverseText', onWarn: 'inverseText' }
+const paneColors = (surface: RenderSurface, theme: MuxTheme | null): PaneColors => {
+  if (surface !== 'terminal') return PANE_HEX
+  if (!theme) return PANE_THEME
+  return {
+    accent: theme.orange ?? PANE_THEME.accent,
+    good: theme.green ?? PANE_THEME.good,
+    bad: theme.red ?? PANE_THEME.bad,
+    warn: theme.yellow ?? PANE_THEME.warn,
+    on: theme.black ?? PANE_THEME.on,
+    onWarn: theme.black ?? PANE_THEME.onWarn,
+  }
+}
 
 const P_LIGHT = '#c4b5fd'
 const P_MID = '#8b5cf6'
@@ -59,6 +74,18 @@ const KIND_COLOR: Record<StepKind, string> = {
   Subagent: '#db2777',
   Tool: '#78716c',
 }
+// The theme colour each kind takes when the multiplexer has a theme; a colour it lacks keeps the hex.
+const KIND_THEME: Record<StepKind, 'yellow' | 'blue' | 'green' | 'orange' | 'magenta' | 'cyan' | 'red' | 'fg'> = {
+  Command: 'yellow',
+  Connector: 'blue',
+  'File read': 'green',
+  'File write': 'orange',
+  Skill: 'magenta',
+  Web: 'cyan',
+  Subagent: 'red',
+  Tool: 'fg',
+}
+const kindColor = (kind: StepKind, theme: MuxTheme | null) => theme?.[KIND_THEME[kind]] ?? KIND_COLOR[kind]
 
 // ---------- Pets: a pixel Claude crab, one body colour per helper ----------
 
@@ -710,6 +737,8 @@ const FLOAT_TICKS = 3
 
 // True when the chat runs in a multiplexer whose backend opens floating panes ($.mux.info()).
 let canFloat = false
+// The multiplexer's theme ($.mux.theme()), read once at session start; null with none.
+let muxTheme: MuxTheme | null = null
 // Only a chat someone watches opens a float by itself, not `claude -p` started in a multiplexer.
 let interactive = false
 // The floating pane and the frame file it reads, also kept in $.state so a reload neither loses
@@ -754,6 +783,7 @@ async function writeOnce($: EngineInterface, file: string) {
     now: await $.clock.now(),
     costUsd: cost.usd,
     width: await floatWidth($, file),
+    theme: muxTheme,
   })
   if (text === lastFrame) return
   lastFrame = text
@@ -790,6 +820,15 @@ async function muxFloats($: EngineInterface) {
     return !!(await $.mux.info())?.floating
   } catch {
     return false
+  }
+}
+
+/** The multiplexer's theme, or null: none, no theme on disk, or a multiplexer plugin from before $.mux.theme (the call throws, and lands here). */
+async function muxPalette($: EngineInterface): Promise<MuxTheme | null> {
+  try {
+    return await $.mux.theme()
+  } catch {
+    return null
   }
 }
 
@@ -1057,6 +1096,8 @@ export const register: Register = (on, options) => {
     const { value: wasHidden = false } = await $.state.get(HIDDEN)
     hidden = wasHidden
     canFloat = await muxFloats($)
+    muxTheme = await muxPalette($)
+    if (muxTheme) $.ui.log(`helper-desk: the pane takes its colours from the multiplexer's ${muxTheme.name} theme.`, { to: 'debug' })
     interactive = e.isInteractive
     // A reload starts the module over: take the open float back from $.state.
     const { value: floated = null } = await $.state.get(FLOAT)
@@ -1224,7 +1265,9 @@ export const register: Register = (on, options) => {
     if (!deskOn()) return next(e)
     const els = $.ui.resolve(e)
     const { Box, Text, Button } = els
-    const C = paneColors(e.surface)
+    // The multiplexer's theme colours the terminal alone; the app keeps its own look.
+    const T = e.surface === 'terminal' ? muxTheme : null
+    const C = paneColors(e.surface, T)
     // The app needs a gap between rows (its smallest step, as the other bands use); the terminal 0.
     const rowGap = e.surface === 'terminal' ? 0 : 'xs'
     // Svg draws on desktop, the editor and mobile; the terminal gets a glyph.
@@ -1256,7 +1299,7 @@ export const register: Register = (on, options) => {
     const frameOf = (hp: Helper) => (hp.phase === 'working' ? Math.floor(clk.tick / FRAME_TICKS) % FRAMES : 0)
 
     const pet = (hp: Helper) => {
-      const hue = hueOf(hp.hue)
+      const hue = hueOf(hp.hue, T)
       const frame = frameOf(hp)
       if (Svg) {
         return (
@@ -1274,7 +1317,7 @@ export const register: Register = (on, options) => {
     }
 
     const card = (hp: Helper) => {
-      const hue = hueOf(hp.hue)
+      const hue = hueOf(hp.hue, T)
       const live = hp.phase === 'working'
       const isOpen = view.open.includes(hp.id)
       const mark = live ? '●' : hp.phase === 'done' ? '✓' : '✗'
@@ -1372,7 +1415,7 @@ export const register: Register = (on, options) => {
                   return (
                     <Box key={`s-${hp.id}-${i}`} flexDirection="row" width={cw}>
                       <Box width={TAG_W}>
-                        <Text color={KIND_COLOR[st.kind]}>{st.kind}</Text>
+                        <Text color={kindColor(st.kind, T)}>{st.kind}</Text>
                       </Box>
                       <Box width={rowW}>
                         <Text wrap="truncate-end">
