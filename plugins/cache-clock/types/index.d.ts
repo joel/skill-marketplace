@@ -13,6 +13,8 @@ export type Clock = {
   note: string
   /** The engine's estimate, in USD, of re-caching the chat; set on a resume, gone after the next reply. */
   usd?: number
+  /** The model the chat runs, for the price table. */
+  model?: string
 }
 
 export type Warm = {
