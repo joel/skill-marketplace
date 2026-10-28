@@ -438,6 +438,9 @@ export const register: Register = on => {
     ) : null
     const tip = roomy && (!narrow || w) ? <Text dimColor wrap={narrow ? 'truncate-end' : undefined}>{TIP}</Text> : null
     const fit = (node: unknown) => (narrow ? <Box width={cols}>{node as never}</Box> : node) as never
+    // The app draws buttons taller than a line of text, so its rows need a gap or the buttons
+    // sit on the line above. A terminal row is one cell high and the band is short of rows there.
+    const rowGap = e.surface === 'terminal' ? 0 : 1
 
     if (left > 0) {
       const share = left / c.ttlMs
@@ -466,7 +469,7 @@ export const register: Register = on => {
       )
       if (narrow) {
         return (
-          <Box flexDirection="column">
+          <Box key="band" flexDirection="column" gap={rowGap}>
             {rest}
             {fit(clock)}
             {roomy ? fit(<Text dimColor wrap="truncate-end">{`Reply now and ${cost} cost 5 to 10% as much.`}</Text>) : null}
@@ -477,7 +480,7 @@ export const register: Register = on => {
         )
       }
       return (
-        <Box flexDirection="column">
+        <Box key="band" flexDirection="column" gap={rowGap}>
           {rest}
           <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
             {clock}
@@ -500,7 +503,7 @@ export const register: Register = on => {
     const note = c.note ? <Text dimColor wrap={narrow ? 'truncate-end' : undefined}>{c.note}</Text> : null
     if (narrow) {
       return (
-        <Box flexDirection="column">
+        <Box key="band" flexDirection="column" gap={rowGap}>
           {rest}
           {fit(
             <Text wrap="truncate-end">
@@ -517,7 +520,7 @@ export const register: Register = on => {
       )
     }
     return (
-      <Box flexDirection="column">
+      <Box key="band" flexDirection="column" gap={rowGap}>
         {rest}
         <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
           <Text>
