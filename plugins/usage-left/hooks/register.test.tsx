@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { layoutOf, pieceOf, textOf, until } from './usage'
+import { layoutOf, pieceOf, stillCurrent, textOf, until } from './usage'
 
 /** The `on` a test body is handed. */
 type On = Parameters<NonNullable<Parameters<typeof test>[2]>>[1]
@@ -11,8 +11,14 @@ const WINDOWS = [
   { kind: 'seven_day', percentUsed: 41, resetsAt: '2099-01-04T07:00:00Z' },
 ]
 
-function rig(on: On, rateLimits: unknown[] = WINDOWS) {
+function rig(on: On, rateLimits: unknown[] = WINDOWS, store: Record<string, unknown> = {}) {
   on('session.start', async ($, e) => ({ cwd: e.cwd }) as never)
+  on('store.get', async ($, e) => ({ value: store[(e as { key: string }).key] }) as never)
+  on('store.set', async ($, e) => {
+    const { key, value } = e as { key: string; value: unknown }
+    store[key] = value
+    return { value: undefined } as never
+  })
   mock.clock(on, { now: NOW })
   on('session.usage', async () => ({ value: { context: { window: 1_000_000 }, rateLimits } }) as never)
   on('session.measure', async ($, e) => ({ changed: (e as { changed: string[] }).changed }) as never)
@@ -20,7 +26,12 @@ function rig(on: On, rateLimits: unknown[] = WINDOWS) {
     const { Text } = $.ui.resolve(e)
     return <Text>REST</Text>
   })
+  return store
 }
+
+/** The colour of the Text that says `text`: a theme key in the terminal, hex in the app. */
+const colourOf = async (v: { findAll: (q: { text: string }) => Promise<unknown[]> }, text: string) =>
+  (await v.findAll({ text })).map(n => (n as { props: { color?: string } }).props.color).find(Boolean)
 
 const band = (bodyColumns = 200) => ({ isWorking: false, hasSurvey: false, maxRows: 10, bodyColumns }) as never
 const begin = { source: 'startup', cwd: '/Users/test/vault', isInteractive: true } as const
@@ -33,7 +44,20 @@ test('the text of a window: percent left, the dot bar, the reset time', () => {
   expect(until('2098-12-31T21:00:00Z', NOW)).toBe('resetting')
   expect(until(undefined, NOW)).toBe('')
   expect(pieceOf({ kind: 'five_hour', percentUsed: 87.5 }, NOW).low, 'under 15% left is LOW').toBe(true)
+  expect(pieceOf({ kind: 'seven_day', percentUsed: 41 }, NOW).role, 'over half left').toBe('good')
+  expect(pieceOf({ kind: 'five_hour', percentUsed: 60 }, NOW).role, 'under half left').toBe('warn')
+  expect(pieceOf({ kind: 'five_hour', percentUsed: 87.5 }, NOW).role, 'LOW').toBe('bad')
   expect(pieceOf({ kind: 'spend_limit', percentUsed: 130 }, NOW).left, 'never below 0').toBe(0)
+})
+
+test('windows read back from the store: well-formed ones whose reset has not passed', () => {
+  const kept = stillCurrent(
+    [...WINDOWS, { kind: 'spend_limit', percentUsed: 90, resetsAt: '2098-12-31T00:00:00Z' }, { kind: 'odd' }, 'junk', { kind: 'no_reset', percentUsed: 5 }],
+    NOW,
+  )
+  expect(kept.map(w => w.kind)).toEqual(['five_hour', 'seven_day', 'no_reset'])
+  expect(stillCurrent(undefined, NOW)).toEqual([])
+  expect(stillCurrent({ not: 'a list' }, NOW)).toEqual([])
 })
 
 test('the layout narrows from full to compact to one window per row', () => {
@@ -53,6 +77,8 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await v.find({ text: '59%' }), '7D').toBeDefined()
     expect(await v.find({ text: '96%' }), '5H').toBeDefined()
     expect(await v.find({ text: ' · 2h 10m' })).toBeDefined()
+    // The terminal draws in Claude Code's theme keys, so an ANSI theme colours the row; the app keeps hex.
+    expect(await colourOf(v, '59%'), '7D has over half left').toBe(surface === 'terminal' ? 'success' : '#16a34a')
     expect(await v.find({ text: 'REST' }), 'other bands still draw').toBeDefined()
     const gap = ((await v.find({ key: 'usage' })) as { props: { gap?: unknown } } | undefined)?.props.gap
     expect(gap, 'rows spaced like the other bands').toBe(surface === 'terminal' ? 0 : 'xs')
@@ -96,5 +122,25 @@ test('a new reading moves the row, and LOW shows under 15% left', { timeoutMs: 3
   const v = await $.ui.mount({ plugin: 'usage-left', surface: 'terminal', component: 'AbovePrompt', props: band() })
   expect(await v.find({ text: '10%' })).toBeDefined()
   expect(await v.find({ text: ' LOW' })).toBeDefined()
+  expect(await colourOf(v, ' LOW'), 'red, in the terminal\'s own palette').toBe('error')
   expect(await v.find({ text: '59%' }), 'the 7D window left the reading').toBeUndefined()
+})
+
+test('a new chat shows the last chat\'s windows until its first reply; a reset that has passed is left out', { timeoutMs: 30000 }, async ($, on) => {
+  const store = rig(on, [], {
+    lastWindows: [...WINDOWS, { kind: 'spend_limit', percentUsed: 90, resetsAt: '2098-12-31T00:00:00Z' }],
+  })
+  await $.session.start({ ...begin, surface: 'terminal' } as never)
+  let v = await $.ui.mount({ plugin: 'usage-left', surface: 'terminal', component: 'AbovePrompt', props: band() })
+  expect(await v.find({ text: '59%' }), '7D from the last chat').toBeDefined()
+  expect(await v.find({ text: '96%' }), '5H from the last chat').toBeDefined()
+  expect(await v.find({ text: /Spend/ }), 'reset at midnight, so stale').toBeUndefined()
+
+  // The first reply's figures replace them, and are kept for the next chat.
+  const fresh = [{ kind: 'five_hour', percentUsed: 90, resetsAt: '2099-01-01T00:10:00Z' }]
+  await $.session.measure({ context: { window: 1_000_000 }, rateLimits: fresh, changed: ['rateLimits'] } as never)
+  v = await $.ui.mount({ plugin: 'usage-left', surface: 'terminal', component: 'AbovePrompt', props: band() })
+  expect(await v.find({ text: '10%' })).toBeDefined()
+  expect(await v.find({ text: '59%' }), 'the last chat\'s 7D is gone').toBeUndefined()
+  expect(store.lastWindows, 'kept for the next chat').toEqual(fresh)
 })
