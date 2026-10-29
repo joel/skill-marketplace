@@ -112,6 +112,9 @@ for (const surface of ['desktop', 'terminal'] as const) {
     v = await $.ui.mount({ plugin: 'cache-clock', surface, component: 'AbovePrompt', props: band() })
     expect(await v.find({ text: /Cache\ warm/ }), 'warm with time left').toBeDefined()
     expect(await v.find({ text: /4:30/ }), '4:30 left after 30 s of a 5 min cache').toBeDefined()
+    // The terminal draws in Claude Code's theme keys, so an ANSI theme colours the band; the app keeps hex.
+    const colour = async (text: string) => (await v.findAll({ text })).map(n => (n as { props: { color?: string } }).props.color).find(Boolean)
+    expect(await colour('◷ Cache warm '), 'green while most of the cache is left').toBe(surface === 'terminal' ? 'success' : '#16a34a')
     expect(await v.find({ text: /5 min cache, as Anthropic's last reply set it/ }), 'read from the transcript').toBeDefined()
     expect(r.ran.find(a => a[0] === 'tail'), 'the transcript tail, no python').toEqual(['tail', '-c', '3000000', TRANSCRIPT])
     expect(r.ran.some(a => a[0] === 'python3'), 'no python3').toBe(false)
@@ -122,6 +125,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     v = await $.ui.mount({ plugin: 'cache-clock', surface, component: 'AbovePrompt', props: band() })
     expect(await v.find({ text: /Cache\ cold/ }), 'cold after 5 min').toBeDefined()
     expect(await v.find({ text: /182k tokens/ }), '182k tokens').toBeDefined()
+    expect(await colour('❄ Cache cold'), 'blue once cold').toBe(surface === 'terminal' ? 'suggestion' : '#2563eb')
     await v.press({ key: 'handoff' })
     expect(REQUEST in r.files, 'handoff request file written').toBe(true)
 
@@ -209,6 +213,7 @@ test('prices: a cache read while warm, a 1.25x or 2x write once cold, nothing fo
   expect(r4(coldUsd('claude-opus-5-5', 182_000, 5 * 60_000))).toBe(0.91)
   expect(r4(coldUsd('claude-opus-5-5[1m]', 182_000, 60 * 60_000)), '1 hour cache, long-context id').toBe(1.456)
   expect(r4(coldUsd('claude-fable-5-1', 1_000_000, 60 * 60_000))).toBe(20)
+  expect(r4(warmUsd('claude-sonnet-5-5', 100_000)), 'Sonnet 5.5 reads at 0.05x its input price').toBe(0.01)
   expect(r4(warmUsd('claude-haiku-5-5', 50_000)), 'Haiku under 100K').toBe(0.0005)
   expect(r4(coldUsd('claude-haiku-5-5', 200_000, 5 * 60_000)), 'Haiku over 100K').toBe(0.125)
   expect(warmUsd('claude-opus-5', 182_000), 'an older model is not priced').toBeNull()

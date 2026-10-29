@@ -4,11 +4,12 @@
 
 type Price = { input: number; read: number }
 
+// A cache read is 0.025x the input price on Fable and Mythos 5.1, 0.05x on Opus and Sonnet 5.5.
 const PRICES: readonly [string, Price][] = [
   ['fable-5-1', { input: 10, read: 0.25 }],
   ['mythos-5-1', { input: 10, read: 0.25 }],
   ['opus-5-5', { input: 4, read: 0.2 }],
-  ['sonnet-5-5', { input: 2, read: 0.2 }],
+  ['sonnet-5-5', { input: 2, read: 0.1 }],
 ]
 /** Haiku 5.5 is $0.10 up to 100K tokens of prompt and $0.50 above; a cache read is a tenth. */
 const HAIKU = 'haiku-5-5'

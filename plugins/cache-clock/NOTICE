@@ -36,3 +36,11 @@ Changes in 0.7.0:
 Changes in 0.7.1:
 - A subagent's turn no longer marks the chat as working, which hid the
   band and paused keep warm until the next main reply.
+
+Changes in 0.7.2:
+- Sonnet 5.5's cache read is priced at $0.10 per million tokens (0.05x the
+  input price, as Anthropic's pricing page lists it), not $0.20. Pointed out
+  in a change proposed to ribbon (robonuggets/ribbon#2, by Gary Udstrand).
+- In the terminal the band's green, yellow, red and blue are Claude Code's
+  theme keys, so an ANSI theme draws them in the terminal's palette; the app
+  keeps the fixed colours.
