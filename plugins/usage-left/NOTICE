@@ -4,3 +4,7 @@ The idea and the window layout (percent left, reset time, LOW under 15%) are
 adapted from ribbon by Jay E / RoboNuggets
 (https://github.com/robonuggets/ribbon), MIT License,
 Copyright (c) 2026 Jay E | RoboNuggets (robonuggets.com).
+
+Showing the last chat's windows until a new chat's first reply, and leaving
+out any whose reset has passed, is adapted from a change proposed to ribbon
+by Artem (BlackWizlock), robonuggets/ribbon#13.
