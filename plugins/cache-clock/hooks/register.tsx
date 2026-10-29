@@ -32,10 +32,12 @@ const TIP = 'Each ping reads the chat from cache for a small part of the price (
 // Turns that are not the person typing: they do not count as "they are back".
 const BACKGROUND = new Set(['task-notification', 'scheduled-trigger', 'peer', 'peer-send-message', 'projects-relay', 'channel', 'coordinator', 'observer', 'observer-activity', 'auto-continuation'])
 
-const GOOD = '#16a34a'
-const WARN = '#ca8a04'
-const BAD = '#dc2626'
-const COLD = '#2563eb'
+// The band's colours. In the terminal they are Claude Code's theme keys, so an ANSI theme draws
+// them in the terminal's own palette (a Zellij theme colours the band too). The app keeps fixed
+// hex, as the Helpers pane does.
+type Palette = { good: string; warn: string; bad: string; cold: string }
+const HEX: Palette = { good: '#16a34a', warn: '#ca8a04', bad: '#dc2626', cold: '#2563eb' }
+const THEME: Palette = { good: 'success', warn: 'warning', bad: 'error', cold: 'suggestion' }
 
 // Module variables reset on a reload; the clock itself lives in $.state.
 let sid = ''
@@ -475,6 +477,7 @@ export const register: Register = on => {
     const drawn = await next(e)
     const rest = drawn && typeof drawn === 'object' && (drawn as { type?: string }).type !== 'engine' ? drawn : null
     const { Box, Text, Button } = $.ui.resolve(e)
+    const C = e.surface === 'terminal' ? THEME : HEX
     const noop = () => undefined
     const left = c.lastEnd + c.ttlMs - c.now
     const cost = `${short(c.tokens)} tokens`
@@ -495,7 +498,7 @@ export const register: Register = on => {
     const roomy = typeof e.props.maxRows !== 'number' || e.props.maxRows >= 6
     const warmButton = w ? <Button key="keepwarm" label="Stop keeping warm" onPress={noop} /> : <Button key="keepwarm" label="Keep warm" onPress={noop} />
     const warmRow = w ? (
-      <Text color={w.cold || w.error ? BAD : COLD} wrap={narrow ? 'truncate-end' : undefined}>
+      <Text color={w.cold || w.error ? C.bad : C.cold} wrap={narrow ? 'truncate-end' : undefined}>
         {warmLine(w, left)}
       </Text>
     ) : null
@@ -508,7 +511,7 @@ export const register: Register = on => {
 
     if (left > 0) {
       const share = left / c.ttlMs
-      const color = left <= 60_000 ? BAD : share < 0.5 ? WARN : GOOD
+      const color = left <= 60_000 ? C.bad : share < 0.5 ? C.warn : C.good
       // "◷ Cache warm 4:30 " and "  5 min cache" take about 32 columns beside the bar.
       const bar = narrow ? Math.max(MIN_BAR, Math.min(BAR, cols - 34)) : BAR
       const filled = Math.max(1, Math.round(share * bar))
@@ -571,7 +574,7 @@ export const register: Register = on => {
           {rest as never}
           {fit(
             <Text wrap="truncate-end">
-              <Text color={COLD}>❄ Cache cold</Text>
+              <Text color={C.cold}>❄ Cache cold</Text>
               <Text dimColor> since {ago(-left)}.</Text>
             </Text>,
           )}
@@ -588,7 +591,7 @@ export const register: Register = on => {
         {rest as never}
         <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
           <Text>
-            <Text color={COLD}>❄ Cache cold</Text>
+            <Text color={C.cold}>❄ Cache cold</Text>
             <Text dimColor> since {ago(-left)}. Your next message re-reads {cost} {fullCost(c)}.</Text>
           </Text>
           {coldButtons}
