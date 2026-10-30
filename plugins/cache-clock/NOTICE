@@ -44,3 +44,9 @@ Changes in 0.7.2:
 - In the terminal the band's green, yellow, red and blue are Claude Code's
   theme keys, so an ANSI theme draws them in the terminal's palette; the app
   keeps the fixed colours.
+
+Changes in 0.7.3:
+- When the full row does not fit, the band tries a short one row before
+  splitting into three, measuring each against the band's width first. From
+  changes proposed to ribbon (robonuggets/ribbon#19, by adroyyyyy, and
+  robonuggets/ribbon#18, by Yaroslav Kabanov).
