@@ -109,6 +109,17 @@ function shortLabel(c: Clock) {
   return '5 min cache (a guess)'
 }
 
+/** What replying now costs, in a few words, for the short row. */
+function warmShort(c: Clock) {
+  const n = warmUsd(c.model ?? '', c.tokens)
+  return n === null ? 'Reply now: 5 to 10% cost.' : `Reply now: about ${usd(n)}.`
+}
+/** What the next message costs, in a few words, for the short row. */
+function coldShort(c: Clock, cost: string) {
+  const n = coldPrice(c)
+  return n === null ? `Next message re-reads ${cost}.` : `Next message: about ${usd(n)}.`
+}
+
 function ttl(): { ttlMs: number; ttlSource: Clock['ttlSource'] } {
   if (demo) return { ttlMs: DEMO_MS, ttlSource: 'demo' }
   if (detected === '1h') return { ttlMs: ONE_HOUR, ttlSource: 'detected' }
@@ -493,8 +504,15 @@ export const register: Register = on => {
       left > 0
         ? `◷ Cache warm ${mmss(left)} ${'━'.repeat(BAR)} ${lengthLabel(c)}. Reply now and ${warmCost(c, cost)}.`
         : `❄ Cache cold since ${ago(-left)}. Your next message re-reads ${cost} ${fullCost(c)}.`
+    // Before splitting, the row tries the same facts in fewer words.
+    const shortRow =
+      left > 0
+        ? `◷ Cache warm ${mmss(left)} ${'━'.repeat(BAR)}  ${shortLabel(c)}. ${warmShort(c)}`
+        : `❄ Cache cold since ${ago(-left)}. ${coldShort(c, cost)}`
     // The engine keeps the last few columns for its own [-] control.
-    const narrow = cols > 0 && cols < oneRow.length + buttonsW + 6
+    const fits = (row: string) => cols <= 0 || row.length + buttonsW + 6 <= cols
+    const compact = !fits(oneRow) && fits(shortRow)
+    const narrow = !fits(oneRow) && !compact
     const roomy = typeof e.props.maxRows !== 'number' || e.props.maxRows >= 6
     const warmButton = w ? <Button key="keepwarm" label="Stop keeping warm" onPress={noop} /> : <Button key="keepwarm" label="Keep warm" onPress={noop} />
     const warmRow = w ? (
@@ -524,8 +542,9 @@ export const register: Register = on => {
           <Text> </Text>
           <Text color={color}>{'━'.repeat(filled)}</Text>
           <Text dimColor>{'━'.repeat(bar - filled)}</Text>
-          {narrow ? <Text dimColor>{`  ${shortLabel(c)}`}</Text> : <Text dimColor>{` ${lengthLabel(c)}.`}</Text>}
-          {narrow ? null : <Text dimColor> Reply now and {warmCost(c, cost)}.</Text>}
+          {narrow ? <Text dimColor>{`  ${shortLabel(c)}`}</Text> : null}
+          {compact ? <Text dimColor>{`  ${shortLabel(c)}. ${warmShort(c)}`}</Text> : null}
+          {narrow || compact ? null : <Text dimColor>{` ${lengthLabel(c)}. Reply now and ${warmCost(c, cost)}.`}</Text>}
         </Text>
       )
       const buttons = (
@@ -592,7 +611,7 @@ export const register: Register = on => {
         <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
           <Text>
             <Text color={C.cold}>❄ Cache cold</Text>
-            <Text dimColor> since {ago(-left)}. Your next message re-reads {cost} {fullCost(c)}.</Text>
+            <Text dimColor>{compact ? ` since ${ago(-left)}. ${coldShort(c, cost)}` : ` since ${ago(-left)}. Your next message re-reads ${cost} ${fullCost(c)}.`}</Text>
           </Text>
           {coldButtons}
         </Box>

@@ -477,14 +477,23 @@ for (const surface of ['desktop', 'terminal'] as const) {
   })
 }
 
-test('a band whose one row would wrap at 160 columns splits instead', { timeoutMs: 30000 }, async ($, on) => {
-  // A 1 hour cache has the longest label: its one row and buttons need about 165 columns.
+test('a band whose one row would wrap says it in short words, then splits', { timeoutMs: 30000 }, async ($, on) => {
+  // A 1 hour cache has the longest label: its one row and buttons need about 165 columns,
+  // its short row about 110.
   const { clock } = rig(on, { transcript: tailOf(reply('1h')) })
-  await $.session.start({ ...begin, surface: 'terminal' } as never)
-  await $.turn.complete({ answer: '' } as never)
-  await clock.settle()
-  let v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band(160) })
-  expect(await v.find({ text: /1 h cache$/ }), 'three rows at 160').toBeDefined()
-  v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band(200) })
-  expect(await v.find({ text: /1 hour cache, as Anthropic's last reply set it/ }), 'one row at 200').toBeDefined()
+  for (const surface of ['terminal', 'desktop'] as const) {
+    await $.session.start({ ...begin, surface } as never)
+    await $.turn.complete({ answer: '' } as never)
+    await clock.settle()
+    let v = await $.ui.mount({ plugin: 'cache-clock', surface, component: 'AbovePrompt', props: band(200) })
+    expect(await v.find({ text: /1 hour cache, as Anthropic's last reply set it/ }), `${surface}: one row at 200`).toBeDefined()
+    for (const cols of [160, 120]) {
+      v = await $.ui.mount({ plugin: 'cache-clock', surface, component: 'AbovePrompt', props: band(cols) })
+      expect(await v.find({ text: /1 h cache\. Reply now: / }), `${surface}: short row at ${cols}`).toBeDefined()
+      expect(await v.find({ key: 'keepwarm' }), `${surface}: buttons kept at ${cols}`).toBeDefined()
+      expect(await v.find({ text: /Reply now and/ }), `${surface}: no second row at ${cols}`).toBeUndefined()
+    }
+    v = await $.ui.mount({ plugin: 'cache-clock', surface, component: 'AbovePrompt', props: band(90) })
+    expect(await v.find({ text: /1 h cache$/ }), `${surface}: three rows at 90`).toBeDefined()
+  }
 })
