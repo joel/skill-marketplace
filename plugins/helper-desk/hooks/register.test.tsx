@@ -395,6 +395,16 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await v.find({ text: /Build the landing page/ }), 'the card draws').toBeDefined()
   })
 
+  test(`the terminal dock takes about a quarter of the width, as the app's panel does (${surface})`, { plugins: [fakeMux], timeoutMs: 30000, options: { pane: 'manual' } }, async ($, on) => {
+    const { opens } = rig(on, {})
+    await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
+    await $.command.run({ command: 'helpers', args: '', presentation: { isFullscreen: true, columns: 280 } } as never)
+    expect(opens.at(-1)?.columns, '24% of 280').toBe(surface === 'terminal' ? 67 : undefined)
+    await $.command.run({ command: 'helpers', args: 'hide' } as never)
+    await $.command.run({ command: 'helpers', args: '', presentation: { isFullscreen: true, columns: 120 } } as never)
+    expect(opens.at(-1)?.columns, 'never so narrow the cards crowd').toBe(surface === 'terminal' ? 44 : undefined)
+  })
+
   test(`each card has one thick sparkle bar (${surface})`, { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
     const { clock } = rig(on, {})
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)

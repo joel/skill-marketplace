@@ -475,6 +475,14 @@ async function setHidden($: EngineInterface, value: boolean) {
   await closeFloat($)
 }
 
+/** The terminal's width, as the last command or band drawing reported it; 0 before either. */
+let termCols = 0
+/** The docked pane's share of the terminal, as the app's side panel takes of its window. */
+const DOCK_SHARE = 0.24
+/** Fewer columns than this and a card's title and figures crowd each other. */
+const DOCK_MIN = 44
+export const dockColumns = (cols: number) => Math.max(DOCK_MIN, Math.round(cols * DOCK_SHARE))
+
 /** Opens the docked pane: the one place its open options live. */
 async function openPane($: EngineInterface) {
   const pane: PaneOpenArgs = { id: PANE, title: TITLE }
@@ -484,6 +492,9 @@ async function openPane($: EngineInterface) {
   // (the multiplexer theme's bg, say) is right only while it matches what is painted. The app
   // keeps its own look.
   if (surface === 'terminal') pane.backgroundColor = 'transparent'
+  // The dock's own share is 45% of the terminal; the app's side panel is about a quarter of its
+  // window, and the cards read the same there. A width the person dragged the dock to still wins.
+  if (surface === 'terminal' && termCols > 0) pane.columns = dockColumns(termCols)
   await $.ui.open(pane)
 }
 
@@ -1133,6 +1144,7 @@ export const register: Register = (on, options) => {
   })
 
   on('command.run', { command: 'helpers' }, async ($, e) => {
+    if (e.presentation?.columns) termCols = e.presentation.columns
     if (!deskOn()) return { text: `${TITLE}'s pane is off. Set pane to auto, float or manual for helper-desk in /config.` }
     if (e.args.trim() === 'float') {
       if (floatPane && (await floatAlive($, floatPane))) {
@@ -1500,6 +1512,7 @@ export const register: Register = (on, options) => {
 
   // The task bar above the prompt: it moves each time a to-do or plan step is marked done.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.surface === 'terminal' && e.viewport?.columns) termCols = e.viewport.columns
     if (!bandOn || e.props.hasSurvey) return next(e)
     const { value: p = null } = await $.state.get(PLAN)
     if (!p || !p.shown || !p.steps.length) return next(e)

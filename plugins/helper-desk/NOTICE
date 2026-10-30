@@ -42,3 +42,7 @@ Changes in 0.8.1:
 - In the terminal, the Helpers pane opens with backgroundColor
   "transparent", so its body paints nothing and sits on the terminal's own
   background like the chat beside it. The app is unchanged.
+
+Changes in 0.8.2:
+- In the terminal the docked pane asks for 24% of the columns (at least 44),
+  the share the app's side panel takes, instead of the dock's default 45%.
