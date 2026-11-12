@@ -18,9 +18,9 @@ export type Clock = {
 }
 
 export type Warm = {
-  /** When keep warm was turned on, in ms: it stops by itself 2 hours later. */
+  /** When keep warm was turned on, in ms. */
   startedAt: number
-  /** Pings sent so far: it stops by itself after 30. */
+  /** Pings sent so far: it stops by itself after 8. */
   pings: number
   /** Cache read tokens of the last ping. */
   read: number

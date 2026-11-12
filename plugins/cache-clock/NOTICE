@@ -50,3 +50,9 @@ Changes in 0.7.3:
   splitting into three, measuring each against the band's width first. From
   changes proposed to ribbon (robonuggets/ribbon#19, by adroyyyyy, and
   robonuggets/ribbon#18, by Yaroslav Kabanov).
+
+Changes in 0.8.0:
+- Keep warm is on by default: each main reply starts it, up to 8 pings (was
+  opt-in, up to 30 pings or 2 hours). A message stops it silently and the
+  reply starts it again; the button or /keepwarm off stops it until the next
+  message. A slash command no longer stops it. The 2 hour cap is gone.

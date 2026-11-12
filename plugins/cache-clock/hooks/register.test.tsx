@@ -108,6 +108,8 @@ for (const surface of ['desktop', 'terminal'] as const) {
 
     await $.turn.complete({ answer: '' } as never)
     await clock.settle()
+    // Keep warm is on by default; off, the cache is let go cold.
+    await $.command.run({ command: 'keepwarm', args: 'off' } as never)
     await clock.advance(30_000)
     v = await $.ui.mount({ plugin: 'cache-clock', surface, component: 'AbovePrompt', props: band() })
     expect(await v.find({ text: /Cache\ warm/ }), 'warm with time left').toBeDefined()
@@ -228,6 +230,7 @@ test('a priced model shows dollars, warm then cold', { timeoutMs: 30000 }, async
   await $.session.start({ ...begin, surface: 'terminal' } as never)
   await $.turn.complete({ answer: '' } as never)
   await clock.settle()
+  await $.command.run({ command: 'keepwarm', args: 'off' } as never)
   let v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band() })
   expect(await v.find({ text: /182k tokens cost about \$0\.04, not \$0\.91/ }), 'warm').toBeDefined()
   await clock.advance(6 * 60_000)
@@ -249,7 +252,6 @@ test('a subagent starting after the reply leaves the band and keep warm alone', 
   await $.turn.start({ turnId: 't2', text: 'task', agentId: 'a1' } as never)
   const v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band() })
   expect(await v.find({ text: /Cache\ warm/ }), 'still shown').toBeDefined()
-  await $.command.run({ command: 'keepwarm', args: '' } as never)
   await clock.advance(4 * 60_000 + 20_000)
   await clock.settle()
   expect(r.forks.length, 'keep warm still pings').toBe(1)
@@ -274,7 +276,6 @@ test('/cacheclock hide hides it in this chat and stops keep warm', { timeoutMs: 
   await $.session.start({ ...begin, surface: 'terminal' } as never)
   await $.turn.complete({ answer: '' } as never)
   await clock.settle()
-  await $.command.run({ command: 'keepwarm', args: '' } as never)
   const said = JSON.stringify(await $.command.run({ command: 'cacheclock', args: 'hide' } as never))
   expect(said, 'hide reply').toContain('hidden in this chat')
   expect(said, 'names the way back').toContain('/cacheclock')
@@ -323,6 +324,7 @@ test('a handoff request nobody takes says the handoff mod is not running', { tim
   await $.command.run({ command: 'cacheclock', args: 'demo' } as never)
   await $.turn.complete({ answer: '' } as never)
   await clock.settle()
+  await $.command.run({ command: 'keepwarm', args: 'off' } as never)
   await clock.advance(61_000)
   let v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band() })
   await v.press({ key: 'handoff' })
@@ -340,6 +342,7 @@ test('a handoff request the handoff mod takes leaves no warning', { timeoutMs: 3
   await $.command.run({ command: 'cacheclock', args: 'demo' } as never)
   await $.turn.complete({ answer: '' } as never)
   await clock.settle()
+  await $.command.run({ command: 'keepwarm', args: 'off' } as never)
   await clock.advance(61_000)
   let v = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: band() })
   await v.press({ key: 'handoff' })
@@ -358,6 +361,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     await $.session.start({ ...begin, surface } as never)
     await $.turn.complete({ answer: '' } as never)
     await clock.settle()
+    await $.command.run({ command: 'keepwarm', args: 'off' } as never)
     const v = await $.ui.mount({ plugin: 'cache-clock', surface, component: 'AbovePrompt', props: band(80) })
     expect(await v.find({ text: /Cache\ warm/ }), 'the clock').toBeDefined()
     expect(await v.find({ text: /5 min cache$/ }), 'the short label').toBeDefined()
@@ -387,7 +391,7 @@ test('a short band drops the cost line and the tip first', { timeoutMs: 30000 },
 })
 
 for (const surface of ['desktop', 'terminal'] as const) {
-  test(`keep warm: the button turns it on, a ping fires before expiry, a prompt stops it (${surface})`, { timeoutMs: 60000 }, async ($, on) => {
+  test(`keep warm: on by default after a reply, a ping fires before expiry, a prompt stops it, the next reply starts it (${surface})`, { timeoutMs: 60000 }, async ($, on) => {
     const { r, clock } = rig(on)
     const props = band(200)
     await $.session.start({ ...begin, surface } as never)
@@ -397,9 +401,8 @@ for (const surface of ['desktop', 'terminal'] as const) {
     let v = await $.ui.mount({ plugin: 'cache-clock', surface, component: 'AbovePrompt', props })
     expect(await v.find({ text: /Each ping reads the chat from cache/ }), 'the tip line shows').toBeDefined()
     expect(await v.find({ text: /\$/ }), 'no money amounts').toBeUndefined()
-    await v.press({ key: 'keepwarm' })
-    v = await $.ui.mount({ plugin: 'cache-clock', surface, component: 'AbovePrompt', props })
-    expect(await v.find({ text: /Keeping warm · first ping in 4:15/ }), 'on, first ping 45 s before the end').toBeDefined()
+    expect(await v.find({ text: /Keeping warm · first ping in 4:15/ }), 'on by itself, first ping 45 s before the end').toBeDefined()
+    expect(await v.find({ key: 'keepwarm' }), 'the button stops it').toBeDefined()
 
     // 4 min in: 60 s left, still too early.
     await clock.advance(4 * 60_000)
@@ -429,25 +432,42 @@ for (const surface of ['desktop', 'terminal'] as const) {
     await clock.settle()
     v = await $.ui.mount({ plugin: 'cache-clock', surface, component: 'AbovePrompt', props })
     expect(await v.find({ text: /Keeping warm/ }), 'stopped by a prompt').toBeUndefined()
-    expect(r.toasts.join(' '), 'the toast says why').toContain('you sent a message')
+    expect(r.toasts.join(' '), 'no toast: the reply starts it again').not.toContain('you sent a message')
+
+    // The reply starts it again, with a fresh count.
+    await $.turn.complete({ answer: '' } as never)
+    await clock.settle()
+    v = await $.ui.mount({ plugin: 'cache-clock', surface, component: 'AbovePrompt', props })
+    expect(await v.find({ text: /Keeping warm · first ping in/ }), 'on again after the reply').toBeDefined()
+
+    // The button stops it, and a reply does not start it again until a message.
+    await v.press({ key: 'keepwarm' })
+    expect(r.toasts.join(' '), 'the toast says until when').toContain('until your next message')
+    await $.turn.complete({ answer: '' } as never)
+    await clock.settle()
+    v = await $.ui.mount({ plugin: 'cache-clock', surface, component: 'AbovePrompt', props })
+    expect(await v.find({ text: /Keeping warm/ }), 'still off after a reply').toBeUndefined()
     await clock.advance(10 * 60_000)
     expect(r.forks.length, 'no more pings once stopped').toBe(2)
+    await $.prompt.submit({ text: 'and again' } as never)
+    await $.turn.complete({ answer: '' } as never)
+    await clock.settle()
+    v = await $.ui.mount({ plugin: 'cache-clock', surface, component: 'AbovePrompt', props })
+    expect(await v.find({ text: /Keeping warm/ }), 'a message and its reply start it again').toBeDefined()
   })
 }
 
 for (const surface of ['desktop', 'terminal'] as const) {
-  test(`keep warm stops by itself after 30 pings, and says when the cache had gone cold (${surface})`, { timeoutMs: 120000 }, async ($, on) => {
+  test(`keep warm stops by itself after 8 pings, and says when the cache had gone cold (${surface})`, { timeoutMs: 120000 }, async ($, on) => {
     const { r, clock } = rig(on)
     const props = band(200)
     await $.session.start({ ...begin, surface } as never)
-    // The 60 s demo cache pings every 15 s, so 30 pings fit well inside the 2 hour cap.
+    // The 60 s demo cache pings every 15 s.
     await $.command.run({ command: 'cacheclock', args: 'demo' } as never)
     const early = JSON.stringify(await $.command.run({ command: 'keepwarm', args: '' } as never))
     expect(early, 'nothing to keep warm before the first reply').toContain('Nothing to keep warm yet')
     await $.turn.complete({ answer: '' } as never)
     await clock.settle()
-    const said = JSON.stringify(await $.command.run({ command: 'keepwarm', args: '' } as never))
-    expect(said, '/keepwarm turns it on').toContain('Keep warm is on')
 
     // A cache write in place of a read is said plainly.
     r.forkUsage = { cache_read_input_tokens: 0, cache_creation_input_tokens: 182_000 }
@@ -458,16 +478,17 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await v.find({ text: /the cache had gone cold, so ping 1 wrote 182k tokens to it again/ }), 'cold write said plainly').toBeDefined()
     r.forkUsage = { cache_read_input_tokens: 182_000, cache_creation_input_tokens: 0 }
 
-    for (let i = 0; i < 600 && r.forks.length < 31; i++) await clock.advance(1000)
+    for (let i = 0; i < 600 && r.forks.length < 9; i++) await clock.advance(1000)
     await clock.settle()
-    expect(r.forks.length, 'exactly 30 pings').toBe(30)
-    expect(r.toasts.join(' '), 'the stop toast names the cap').toContain('after 30 pings')
+    expect(r.forks.length, 'exactly 8 pings').toBe(8)
+    expect(r.toasts.join(' '), 'the stop toast names the cap').toContain('after 8 pings')
     v = await $.ui.mount({ plugin: 'cache-clock', surface, component: 'AbovePrompt', props })
     expect(await v.find({ text: /Keeping warm/ }), 'off after the cap').toBeUndefined()
     expect(await v.find({ key: 'keepwarm' }), 'the button is back to Keep warm').toBeDefined()
 
     // /keepwarm toggles; /keepwarm off stops it.
-    await $.command.run({ command: 'keepwarm', args: '' } as never)
+    const said = JSON.stringify(await $.command.run({ command: 'keepwarm', args: '' } as never))
+    expect(said, '/keepwarm turns it on').toContain('It stops after 8 pings')
     v = await $.ui.mount({ plugin: 'cache-clock', surface, component: 'AbovePrompt', props })
     expect(await v.find({ text: /Keeping warm/ }), 'on again').toBeDefined()
     const offSaid = JSON.stringify(await $.command.run({ command: 'keepwarm', args: 'off' } as never))
@@ -496,4 +517,29 @@ test('a band whose one row would wrap says it in short words, then splits', { ti
     v = await $.ui.mount({ plugin: 'cache-clock', surface, component: 'AbovePrompt', props: band(90) })
     expect(await v.find({ text: /1 h cache$/ }), `${surface}: three rows at 90`).toBeDefined()
   }
+})
+
+test('a 1 hour cache is kept warm past 2 hours: 8 pings is the only cap', { timeoutMs: 60000 }, async ($, on) => {
+  const { r, clock } = rig(on, { transcript: tailOf(reply('1h')) })
+  await $.session.start({ ...begin, surface: 'terminal' } as never)
+  await $.turn.complete({ answer: '' } as never)
+  await clock.settle()
+  // One ping 45 s before each hour is up.
+  for (let i = 0; i < 3; i++) {
+    await clock.advance(59 * 60_000 + 16_000)
+    await clock.settle()
+  }
+  expect(r.forks.length, 'three pings, about 3 hours in').toBe(3)
+  expect(r.toasts.join(' '), 'no time cap').not.toContain('Keep warm stopped')
+})
+
+test('a slash command with no turn, such as /cost, leaves keep warm on', { timeoutMs: 30000 }, async ($, on) => {
+  const { r, clock } = rig(on)
+  await $.session.start({ ...begin, surface: 'terminal' } as never)
+  await $.turn.complete({ answer: '' } as never)
+  await clock.settle()
+  await $.prompt.submit({ text: '/cost' } as never)
+  await clock.advance(4 * 60_000 + 20_000)
+  await clock.settle()
+  expect(r.forks.length, 'the ping still goes out').toBe(1)
 })
