@@ -18,13 +18,13 @@ const MIN_BAR = 8
 // The handoff mod takes a request within 5 s; one still there after this means it is not running.
 const HANDOFF_WAIT_MS = 7_000
 
-// Keep warm: one small background ping about 45 s before the cache would go cold.
+// Keep warm: one small background ping about 45 s before the cache would go cold. It is on
+// by default: each main reply starts it, up to 8 pings, unless the person turned it off.
 // $.model.fork repeats the main thread's last request (same model, system prompt,
 // tools, messages) with this one line after it, so the API reads the chat from its
 // cache and the cache's timer starts again. The fork never writes the transcript.
 const LEAD = 45_000
-const MAX_PINGS = 30
-const MAX_MS = 2 * 60 * 60_000
+const MAX_PINGS = 8
 const MAX_FAILS = 3
 const RETRY_MS = 20_000
 const PING_PROMPT = 'Reply with the single word: ok'
@@ -49,6 +49,10 @@ let pinging = false
 // When this turn's last main-thread request started: the cache's hour or 5 minutes count from it,
 // not from the end of the reply. 0 until a step of this turn has been seen.
 let stepAt = 0
+
+// Set when the person stops keep warm (its button or /keepwarm off): the next reply does not
+// start it again until they send a message.
+let declined = false
 
 // Hide (its button or /cacheclock hide) hides the clock in this chat; /cacheclock shows it.
 // Kept in $.state so a reload keeps it. A lasting "off" is /plugin disable cache-clock.
@@ -169,6 +173,12 @@ async function startWarm($: EngineInterface): Promise<'on' | 'none'> {
   return 'on'
 }
 
+// Keep warm by default: a main reply starts it, unless it is hidden, turned off, or already on.
+async function autoWarm($: EngineInterface) {
+  if (hidden || declined || (await getWarm($))) return
+  await startWarm($)
+}
+
 async function stopWarm($: EngineInterface, why: string, shout = true) {
   const w = await getWarm($)
   if (!w) return
@@ -182,7 +192,6 @@ async function warmTick($: EngineInterface) {
   const w = await getWarm($)
   if (!w || pinging || working) return
   const now = await $.clock.now()
-  if (now - w.startedAt >= MAX_MS) return stopWarm($, 'Keep warm stopped after 2 hours. Type /keepwarm to start it again.')
   if (w.pings >= MAX_PINGS) return stopWarm($, `Keep warm stopped after ${MAX_PINGS} pings. Type /keepwarm to start it again.`)
   if (now < w.retryAt) return
   const c = await getClock($)
@@ -295,6 +304,7 @@ async function restart($: EngineInterface) {
   const model = await $.session.model().catch(() => '')
   await detect($).catch(() => undefined)
   await setClock($, { lastEnd, ...ttl(), tokens: context.tokens ?? 0, now, note: '', ...(model ? { model } : {}) })
+  await autoWarm($)
 }
 
 // Once a second: moves the countdown while the band shows.
@@ -351,7 +361,7 @@ export const register: Register = on => {
     })
     await $.command.register({
       name: 'keepwarm',
-      description: 'Cache Clock: keep the cache warm with a small background ping 45 s before it goes cold. "/keepwarm off" stops it',
+      description: 'Cache Clock: keep the cache warm (on by default after each reply, up to 8 pings) with a small background ping 45 s before it goes cold. "/keepwarm off" stops it until your next message',
       argumentHint: '[off]',
       immediate: true,
     })
@@ -372,6 +382,7 @@ export const register: Register = on => {
     transcriptPath = typeof e.transcript_path === 'string' ? e.transcript_path : ''
     detected = 'unknown'
     stepAt = 0
+    declined = false
     // The old chat's clock and keep warm never carry over, seeded or not.
     await stopWarm($, `Keep warm stopped: the chat was ${e.source === 'clear' ? 'cleared' : e.source === 'compact' ? 'compacted' : 'switched'}.`, false)
     await setClock($, null)
@@ -425,12 +436,15 @@ export const register: Register = on => {
     return result
   })
 
-  // The person is back: a prompt of theirs ends keep warm. Its own commands do not.
+  // The person is back: a message of theirs ends keep warm. A slash command does not: many
+  // (/cost, /context, /model) send no request, so no reply would start keep warm again.
   on('prompt.submit', async ($, e, next) => {
     const text = e.text.trim().toLowerCase()
-    const own = text.startsWith('/keepwarm') || text.startsWith('/cacheclock') || text === PING_PROMPT.toLowerCase()
+    const own = text.startsWith('/') || text === PING_PROMPT.toLowerCase()
     if (!own && !BACKGROUND.has(e.origin?.kind ?? '')) {
-      void stopWarm($, 'Keep warm stopped: you sent a message.').catch(() => undefined)
+      // Silent: the reply starts it again, so a toast on every message would only be noise.
+      declined = false
+      void stopWarm($, 'Keep warm stopped: you sent a message.', false).catch(() => undefined)
     }
     return next(e)
   })
@@ -439,17 +453,24 @@ export const register: Register = on => {
     const arg = e.args.trim().toLowerCase()
     const w = await getWarm($)
     if (arg === 'off' || (arg !== 'on' && w)) {
+      declined = true
       await stopWarm($, 'Keep warm is off.', false)
-      return { text: 'Keep warm is off. Type /keepwarm to start it again.' }
+      return { text: 'Keep warm is off until your next message. Type /keepwarm to start it again.' }
     }
     if (w) return { text: 'Keep warm is already on. Type /keepwarm off to stop it.' }
-    if ((await startWarm($)) === 'none') return { text: "Nothing to keep warm yet. Keep warm works after Claude's first reply." }
-    return { text: 'Keep warm is on: one small background ping about 45 s before the cache goes cold. It stops after 2 hours, 30 pings, or when you send a message. Type /keepwarm off to stop it.' }
+    declined = false
+    if ((await startWarm($)) === 'none') return { text: "Nothing to keep warm yet. Keep warm starts by itself after Claude's first reply." }
+    return { text: `Keep warm is on: one small background ping about 45 s before the cache goes cold. It stops after ${MAX_PINGS} pings, or when you send a message, and each reply starts it again. Type /keepwarm off to stop it.` }
   })
 
   on('ui.press', { plugin: 'cache-clock', element: 'keepwarm' }, async ($, e) => {
-    if (await getWarm($)) await stopWarm($, 'Keep warm is off.')
-    else if ((await startWarm($)) === 'on') toast($, 'Keep warm is on. Type /keepwarm off to stop it.')
+    if (await getWarm($)) {
+      declined = true
+      await stopWarm($, 'Keep warm is off until your next message.')
+    } else {
+      declined = false
+      if ((await startWarm($)) === 'on') toast($, 'Keep warm is on. Type /keepwarm off to stop it.')
+    }
     return { element: e.element }
   })
 
