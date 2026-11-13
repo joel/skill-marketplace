@@ -74,7 +74,7 @@
         "url": "https://www.benai.co"
       },
       "category": "productivity",
-      "version": "0.8.2",
+      "version": "0.8.3",
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/joel/skill-marketplace.git",
@@ -147,12 +147,12 @@
     },
     {
       "name": "usage-left",
-      "description": "One row above the prompt: how much of your 7-day and 5-hour usage windows is left, and when each resets. LOW under 15%. Reads the engine's own figures, so it costs no tokens; draws nothing off a subscription",
+      "description": "One row above the prompt: how much of your 7-day and 5-hour usage windows is left, when each resets, and what this session has cost so far (the /cost total, at list prices). LOW under 15%. Reads the engine's own figures, so it costs no tokens; on an API key it shows the cost alone",
       "author": {
         "name": "Joel Azemar"
       },
       "category": "productivity",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/joel/skill-marketplace.git",

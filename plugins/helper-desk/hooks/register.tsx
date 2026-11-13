@@ -1247,6 +1247,22 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  // Each main-thread measurement carries the chat's cost: the tile follows it after the last
+  // helper ends, and down after /clear. Every value, since `changed` names cost only when it grew.
+  // On or off, so the tile is current when the pane opens later.
+  on('session.measure', async ($, e, next) => {
+    const usd = e.cost?.usd
+    if (typeof usd === 'number') {
+      void (async () => {
+        const { value } = await $.state.get(COST)
+        if (value?.usd === usd) return
+        await $.state.set(COST, { usd })
+        await writeFrame($)
+      })().catch(err => log($, `measure cost: ${String(err)}`))
+    }
+    return next(e)
+  })
+
   on('prompt.submit', async ($, e, next) => {
     turnCalls = 0
     turnPlanned = false

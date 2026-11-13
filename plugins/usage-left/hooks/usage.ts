@@ -79,11 +79,21 @@ export const SEP = 3
 
 export type Layout = 'full' | 'compact' | 'stacked'
 
-/** The widest layout whose row fits `cols` (0: unknown, so full). */
-export const layoutOf = (pieces: readonly Piece[], cols: number): Layout => {
-  if (cols <= 0) return 'full'
+/** A dollar amount: two decimals, "under $0.01" below a cent. Copied from cache-clock's price.ts. */
+export const usd = (n: number) => (n < 0.01 ? 'under $0.01' : `$${n.toFixed(2)}`)
+
+export const COST_LABEL = 'Session cost'
+/** The session's cost: labelled, or the bare amount where the row is short of room. */
+export const costText = (n: number, labelled: boolean): string => (labelled ? `${COST_LABEL} ${usd(n)}` : usd(n))
+
+/** The widest layout whose row fits `cols` (0: unknown, so full). With no windows the cost stands alone, in one form. */
+export const layoutOf = (pieces: readonly Piece[], cols: number, cost: number | null = null): Layout => {
+  if (cols <= 0 || pieces.length === 0) return 'full'
   const width = (full: boolean) =>
-    (full ? LABEL.length + SEP : 0) + pieces.reduce((n, p) => n + textOf(p, full).length, 0) + SEP * (pieces.length - 1)
+    (full ? LABEL.length + SEP : 0) +
+    pieces.reduce((n, p) => n + textOf(p, full).length, 0) +
+    SEP * (pieces.length - 1) +
+    (cost === null ? 0 : SEP + costText(cost, full).length)
   if (width(true) <= cols) return 'full'
   if (width(false) <= cols) return 'compact'
   return 'stacked'
