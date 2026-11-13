@@ -50,7 +50,7 @@ function rig(on: On, files: Record<string, string>, env: Record<string, string> 
   const statuses: (string | undefined)[] = []
   const opened: string[] = []
   // Each open as it was asked for, so a test can check its options beside its id.
-  const opens: { id: string; backgroundColor?: string }[] = []
+  const opens: { id: string; backgroundColor?: string; columns?: number }[] = []
   const closed: string[] = []
   const ran: string[][] = []
   const toasts: string[] = []
@@ -65,7 +65,9 @@ function rig(on: On, files: Record<string, string>, env: Record<string, string> 
   // The multiplexer's panes, by id; each float adds terminal_7, terminal_8, ...
   const panes = new Set<string>()
   let nextPane = 7
-  on('session.usage', async () => ({ value: { startedAt: 0, context: {}, rateLimits: [], cost: { usd: 0.42 } } }) as never)
+  let usd = 0.42
+  on('session.usage', async () => ({ value: { startedAt: 0, context: {}, rateLimits: [], cost: { usd } } }) as never)
+  on('session.measure', async ($, e) => ({ changed: (e as { changed: string[] }).changed }) as never)
   on('command.register', async () => ({ value: undefined }) as never)
   on('tool.register', async ($, e) => {
     specs.push(e as { isDeferred?: boolean })
@@ -81,7 +83,7 @@ function rig(on: On, files: Record<string, string>, env: Record<string, string> 
   on('agent.list', async () => ({ value: agents.map(a => ({ ...a })) }) as never)
   on('ui.open', async ($, e) => {
     opened.push((e as { id: string }).id)
-    opens.push(e as { id: string; backgroundColor?: string })
+    opens.push(e as { id: string; backgroundColor?: string; columns?: number })
     return { value: { isPlaced: true } } as never
   })
   on('ui.close', async ($, e) => {
@@ -140,7 +142,7 @@ function rig(on: On, files: Record<string, string>, env: Record<string, string> 
     }
     return { value: { exitCode: 0, stdout, stderr: '' } } as never
   })
-  return { agents, statuses, opened, opens, closed, ran, clock, toasts, panes }
+  return { agents, statuses, opened, opens, closed, ran, clock, toasts, panes, setCost: (n: number) => void (usd = n) }
 }
 
 /** What the band says: the drawing's alt text on desktop, every text in the terminal. */
@@ -866,4 +868,28 @@ test('a multiplexer plugin without $.mux.theme leaves the pane as it was', { plu
   await clock.settle()
   const v = await $.ui.mount({ plugin: 'helper-desk', surface: 'terminal', component: 'Pane', requestId: 'helpers', props: props() })
   expect((await v.find({ key: 'head-running' }))?.props.backgroundColor, 'the theme key').toBe('success')
+})
+
+test('the cost tile follows each measurement after the last helper ends', { plugins: [fakeMux], timeoutMs: 30000 }, async ($, on) => {
+  const { clock, setCost } = rig(on, {})
+  await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface: 'terminal', isInteractive: true } as never)
+  await $.agent.spawn({ tool_use_id: 'spawn1', prompt: 'Do the job.', description: 'Read the notes', subagentType: 'Explore', model: 'haiku' } as never)
+  await clock.settle()
+  await $.turn.complete({ answer: 'Done.', agentId: 'agent-a1', reason: 'answer', durationMs: 1000, isAborted: false, turnId: 't1' } as never)
+  await clock.settle()
+  // A late readCost would agree with the measurement, so only the measurement is tested.
+  setCost(1.5)
+  const measure = async (cost?: number) => {
+    await $.session.measure({ context: {}, rateLimits: [], changed: [], ...(cost === undefined ? {} : { cost: { usd: cost } }) } as never)
+    await clock.settle()
+  }
+  const v = await $.ui.mount({ plugin: 'helper-desk', surface: 'terminal', component: 'Pane', requestId: 'helpers', props: props() })
+  const tile = () => v.find({ text: /\$\d+\.\d\d/ }) as Promise<{ text: string } | undefined>
+  await measure(1.5)
+  expect((await tile())?.text).toMatch(/\$1\.50/)
+  setCost(0.1)
+  await measure(0.1)
+  expect((await tile())?.text, 'lower, as after /clear').toMatch(/\$0\.10/)
+  await measure()
+  expect((await tile())?.text, 'no cost: unchanged').toMatch(/\$0\.10/)
 })

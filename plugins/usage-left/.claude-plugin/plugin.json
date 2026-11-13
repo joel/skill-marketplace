@@ -1,7 +1,7 @@
 {
   "name": "usage-left",
-  "version": "0.2.0",
-  "description": "One row above the prompt: how much of your 7-day and 5-hour usage windows is left, and when each resets. LOW under 15%",
+  "version": "0.3.0",
+  "description": "One row above the prompt: how much of your 7-day and 5-hour usage windows is left, when each resets, and what this session has cost so far (the /cost total, at list prices). LOW under 15%. Reads the engine's own figures, so it costs no tokens; on an API key it shows the cost alone",
   "author": {
     "name": "Joel Azemar"
   },

@@ -46,3 +46,8 @@ Changes in 0.8.1:
 Changes in 0.8.2:
 - In the terminal the docked pane asks for 24% of the columns (at least 44),
   the share the app's side panel takes, instead of the dock's default 45%.
+
+Changes in 0.8.3:
+- The "Total chat cost" tile follows each main-thread measurement
+  (session.measure), so it keeps updating after the last subagent finishes,
+  and drops after /clear.
