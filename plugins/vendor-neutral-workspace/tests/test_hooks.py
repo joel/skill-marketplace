@@ -132,6 +132,49 @@ class Hooks(unittest.TestCase):
         result = self.hook("Stop", self.root, session="never-started")
         self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "", ""))
 
+    # task_layout: files ------------------------------------------------------
+
+    def files_layout(self, area: str = "home") -> Path:
+        config = self.root / "workspace.yaml"
+        config.write_text(config.read_text(encoding="utf-8") + "task_layout: files\n", encoding="utf-8")
+        (self.root / "tasks").mkdir()
+        task = self.root / "tasks" / "T-0001.md"
+        task.write_text(
+            "# T-0001 — Fix the gate\n\n- Status: ready\n- Priority: normal\n- Owner: main\n"
+            f"- Area: {area}\n- Due: none\n- Depends-on: none\n- Approval: not-required\n"
+            "- Approval-packet: none\n- Evidence: none-yet\n\n#### Next action\n\nCall the electrician.\n",
+            encoding="utf-8",
+        )
+        return task
+
+    def test_files_layout_session_start_rebuilds_and_injects_the_index(self) -> None:
+        self.files_layout()
+        result = self.hook("SessionStart", self.root)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("task_layout: files", context)
+        self.assertIn("T-0001", context)
+        self.assertIn("Call the electrician.", (self.root / "TASKS.md").read_text(encoding="utf-8"))
+
+    def test_files_layout_stop_rebuilds_the_index_after_a_task_change(self) -> None:
+        task = self.files_layout()
+        self.start_session()
+        task.write_text(task.read_text(encoding="utf-8").replace("Status: ready", "Status: waiting"), encoding="utf-8")
+        self.session_file.write_text("touched\n", encoding="utf-8")
+        result = self.hook("Stop", self.root)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        index = (self.root / "TASKS.md").read_text(encoding="utf-8")
+        self.assertIn("T-0001", index.split("## Waiting")[1].split("## Known issues")[0])
+
+    def test_files_layout_stop_blocks_once_on_a_malformed_task(self) -> None:
+        task = self.files_layout()
+        self.start_session()
+        task.write_text(task.read_text(encoding="utf-8").replace("- Area: home\n", ""), encoding="utf-8")
+        self.session_file.write_text("touched\n", encoding="utf-8")
+        first = self.hook("Stop", self.root)
+        self.assertEqual(first.returncode, 2)
+        self.assertIn("missing '- Area:' line", first.stderr)
+        self.assertEqual(self.hook("Stop", self.root).returncode, 0)
 
 if __name__ == "__main__":
     unittest.main()

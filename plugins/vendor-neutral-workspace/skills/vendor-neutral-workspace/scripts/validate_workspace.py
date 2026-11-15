@@ -119,28 +119,52 @@ def check_tasks_markdown(root: Path, warnings: list[str]) -> None:
         return
     text = path.read_text(encoding="utf-8", errors="replace")
     for block in re.split(r"(?m)^(?=### )", text)[1:]:
-        heading = re.match(r"### (\S+)", block)
-        status = re.search(r"(?m)^- Status:\s*(\S*)", block)
-        if not heading or not status:
-            continue
-        task = heading.group(1)
-        token = re.match(r"[a-z-]+", status.group(1))
-        if not token or token.group(0) not in TASK_STATUSES:
-            warnings.append(f"task {task}: status '{status.group(1)}' not in vocabulary")
-        approval = re.search(r"(?m)^- Approval:\s*(\S*)", block)
-        if approval:
-            token = re.match(r"[a-z-]+", approval.group(1))
-            if not token or token.group(0) not in APPROVAL_STATES:
-                warnings.append(f"task {task}: approval '{approval.group(1)}' not in vocabulary")
-        packet = re.search(r"(?m)^- Approval-packet:\s*(.*)$", block)
-        if not packet:
-            warnings.append(f"task {task}: no Approval-packet line")
-        elif packet.group(1).strip().startswith("unknown"):
-            warnings.append(f"task {task}: Approval-packet unknown (write the packet or set none)")
-        else:
-            for named in re.findall(r"approvals/[A-Za-z0-9._-]+\.md", packet.group(1)):
-                if not (root / named).is_file():
-                    warnings.append(f"task {task}: approval packet not found: {named}")
+        check_task_block(root, block, r"### (\S+)", warnings)
+
+
+def check_task_block(root: Path, block: str, heading_pattern: str, warnings: list[str]) -> None:
+    heading = re.match(heading_pattern, block)
+    status = re.search(r"(?m)^- Status:\s*(\S*)", block)
+    if not heading or not status:
+        return
+    task = heading.group(1)
+    token = re.match(r"[a-z-]+", status.group(1))
+    if not token or token.group(0) not in TASK_STATUSES:
+        warnings.append(f"task {task}: status '{status.group(1)}' not in vocabulary")
+    approval = re.search(r"(?m)^- Approval:\s*(\S*)", block)
+    if approval:
+        token = re.match(r"[a-z-]+", approval.group(1))
+        if not token or token.group(0) not in APPROVAL_STATES:
+            warnings.append(f"task {task}: approval '{approval.group(1)}' not in vocabulary")
+    packet = re.search(r"(?m)^- Approval-packet:\s*(.*)$", block)
+    if not packet:
+        warnings.append(f"task {task}: no Approval-packet line")
+    elif packet.group(1).strip().startswith("unknown"):
+        warnings.append(f"task {task}: Approval-packet unknown (write the packet or set none)")
+    else:
+        for named in re.findall(r"approvals/[A-Za-z0-9._-]+\.md", packet.group(1)):
+            if not (root / named).is_file():
+                warnings.append(f"task {task}: approval packet not found: {named}")
+
+
+def check_task_files(root: Path, errors: list[str], warnings: list[str]) -> None:
+    """task_layout: files: tasks/<ID>.md hold the tasks and TASKS.md is the index built from them."""
+    import datetime
+    import importlib.util
+
+    if not (root / "tasks").is_dir():
+        errors.append("workspace.yaml says task_layout: files but tasks/ is missing")
+        return
+    for path in sorted((root / "tasks").glob("*.md")):
+        check_task_block(root, path.read_text(encoding="utf-8", errors="replace"), r"# (\S+)", warnings)
+    spec = importlib.util.spec_from_file_location("build_task_index", Path(__file__).with_name("build_task_index.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    text, problems = module.build(root, datetime.date.today().isoformat())
+    warnings.extend(f"task file: {problem}" for problem in problems)
+    index = root / "TASKS.md"
+    if text and (not index.is_file() or index.read_text(encoding="utf-8") != text):
+        warnings.append("TASKS.md is stale or hand-edited: run scripts/build_task_index.py --root <root>")
 
 
 def check_decisions(root: Path, errors: list[str], warnings: list[str]) -> None:
@@ -213,7 +237,12 @@ def main() -> int:
     agent_id = check_agent(root, errors, warnings)
     config = check_workspace_yaml(root, agent_id, errors)
     if config.get("tasks") == "markdown":
-        check_tasks_markdown(root, warnings)
+        if config.get("task_layout") == "files":
+            check_task_files(root, errors, warnings)
+        else:
+            check_tasks_markdown(root, warnings)
+    elif config.get("task_layout") == "files":
+        errors.append("task_layout: files requires tasks: markdown")
 
     for relative in MEMORY_BANK_FILES:
         path = root / relative

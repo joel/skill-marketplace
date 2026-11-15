@@ -36,7 +36,7 @@ Read [the workspace standard](references/workspace-standard.md) for initialise, 
 4. For a populated target, present the proposed mapping and risks before relocating, renaming, deleting, or overwriting anything. If the target is a v1 workspace (`project/` and `agents/<id>/`), run `scripts/migrate_v1.py --root <dir>` for the preview, then follow [the migration guide](references/migration-v1.md); it moves and converts what it can and leaves `<!-- MIGRATION: ... -->` markers where judgement is needed. In Claude Code the command `/vendor-neutral-workspace:migrate` does the whole guide in one go.
 5. Create only missing structure. Preserve unrelated content and never silently replace an existing file.
 6. Populate files with actual project facts or clearly marked `unknown` items. Never turn guesses into durable facts.
-7. Choose the task backend (`--tasks`, default `markdown`; propose `beads` when `bd` is on PATH and the project needs computed ready-work or atomic claims), record the agent's identity in `AGENTS.md`, create an initial task, record the initialisation session, and state the next action.
+7. Choose the task backend (`--tasks`, default `markdown`; propose `beads` when `bd` is on PATH and the project needs computed ready-work or atomic claims; propose `task_layout: files` when the workspace holds many unrelated matters and each session is about one of them), record the agent's identity in `AGENTS.md`, create an initial task, record the initialisation session, and state the next action.
 
 When Python 3 is available, preview deterministic creation with:
 
@@ -61,6 +61,7 @@ Before meaningful work:
 
 During work:
 
+- with `task_layout: files`, change tasks in `tasks/<ID>.md` only and let the hook or `scripts/build_task_index.py` regenerate `TASKS.md`; put a value two tasks share in `facts/`;
 - keep `memory-bank/activeContext.md` concise and current, and when the user says "update memory bank" review every file in `memory-bank/`;
 - record facts, inferences, assumptions, proposals, decisions, and approvals as different categories;
 - write a decision record under `docs/decisions/` when a choice could later be undone without knowing why it was made, and stop to propose a change when a task conflicts with an accepted record;

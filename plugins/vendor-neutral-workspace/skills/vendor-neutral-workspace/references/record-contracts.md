@@ -17,7 +17,8 @@ Every task, whatever backend holds it (see [the task backends](task-backends.md)
 - an approval state from `not-required | required | requested | approved | rejected` and, when not `not-required`, the path of the approval packet under `approvals/`;
 - evidence as paths or links, or `none-yet`;
 - blockers, or none;
-- one concrete next action.
+- one concrete next action;
+- with `task_layout: files`, an area and a due date (`YYYY-MM-DD` or `none`), and optionally a log path, shared-fact links and `Kind: known-issue` (see the task backends).
 
 Completion requires met acceptance criteria and evidence. A task with consequential execution stays in `review` until required approval or verification is complete. The Markdown rendering of this contract is in the task backends reference; Beads maps the same fields onto its own.
 

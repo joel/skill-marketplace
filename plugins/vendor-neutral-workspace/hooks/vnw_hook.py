@@ -2,8 +2,9 @@
 """Claude Code hooks for a vendor-neutral workspace.
 
 session-start: remind the agent of the boot sequence (and inject `bd prime` for the
-Beads backend). stop: block once per session when no session record was written,
-and warn once when the memory bank was not touched after real work.
+Beads backend; for task_layout: files, rebuild TASKS.md and inject it). stop: for task_layout: files, rebuild TASKS.md and block once when a task file is
+malformed; then block once per session when no session record was written, and
+warn once when the memory bank was not touched after real work.
 
 Scope guard: the hook does nothing unless the session's cwd (or its git top level)
 holds a workspace.yaml with `hooks: on`. Outside a workspace it exits 0 silently.
@@ -35,6 +36,21 @@ BLOCK_REASON = (
     "skill's record-contracts.md) with what was done, decided, and handed off, update "
     "memory-bank/activeContext.md and progress.md if anything changed, then finish. If this "
     "session did no work, write a one-line record saying so."
+)
+FILES_BOOT_REMINDER = (
+    "This directory is a vendor-neutral workspace with one file per task (task_layout: files). "
+    "Before meaningful work follow the boot sequence in AGENTS.md: read memory-bank/activeContext.md "
+    "and the task index below (generated from tasks/*.md; this hook rebuilds it at session start and "
+    "after every turn, never edit it by hand), raise anything OVERDUE, then open only the named task's "
+    "file, its - Facts: files and its - Log: when history matters. Read the other memory-bank files "
+    "when the task touches them, and all of them on a cold start. Open a session record under "
+    "sessions/YYYY/MM/. Ending a turn without a session record written this session is blocked once "
+    "by the workspace hook; a session that did no work still gets a one-line record."
+)
+INDEX_SCRIPT = Path(__file__).resolve().parents[1] / "skills" / "vendor-neutral-workspace" / "scripts" / "build_task_index.py"
+INDEX_BLOCK_REASON = (
+    "vendor-neutral-workspace: the task index could not be rebuilt because a task file breaks the "
+    "contract. Fix these in tasks/, then finish (the hook rebuilds TASKS.md itself):\n"
 )
 MEMORY_BANK_WARNING = (
     "vendor-neutral-workspace: a session record was written but no memory-bank/ file changed. "
@@ -99,6 +115,14 @@ def newest_mtime(directory: Path) -> float:
     return max((p.stat().st_mtime for p in directory.rglob("*") if p.is_file()), default=0.0)
 
 
+def rebuild_index(workspace: Path) -> tuple[bool, str]:
+    """Rebuild TASKS.md from tasks/*.md. Returns (ok, error text)."""
+    result = subprocess.run(
+        [sys.executable, str(INDEX_SCRIPT), "--root", str(workspace)], capture_output=True, text=True, timeout=15,
+    )
+    return result.returncode == 0, result.stderr.strip()
+
+
 def session_start(payload: dict[str, object], workspace: Path, config: dict[str, str]) -> int:
     session_id = str(payload.get("session_id", "unknown"))
     state = load_state(session_id)
@@ -108,6 +132,14 @@ def session_start(payload: dict[str, object], workspace: Path, config: dict[str,
         save_state(session_id, state)
 
     context = BOOT_REMINDER
+    if config.get("task_layout") == "files":
+        context = FILES_BOOT_REMINDER
+        ok, problems = rebuild_index(workspace)
+        index = workspace / "TASKS.md"
+        if index.is_file():
+            context += "\n\nTask index (TASKS.md):\n" + index.read_text(encoding="utf-8")[:8000]
+        if not ok:
+            context += "\n\nThe index could not be rebuilt; fix these task files first:\n" + problems[:2000]
     if config.get("tasks") == "beads" and shutil.which("bd"):
         prime = subprocess.run(
             ["bd", "prime"], cwd=workspace, capture_output=True, text=True, timeout=15,
@@ -119,11 +151,18 @@ def session_start(payload: dict[str, object], workspace: Path, config: dict[str,
     return 0
 
 
-def stop(payload: dict[str, object], workspace: Path) -> int:
+def stop(payload: dict[str, object], workspace: Path, config: dict[str, str]) -> int:
+    if config.get("task_layout") == "files":
+        ok, problems = rebuild_index(workspace)  # the agent never has to remember the rebuild
     if payload.get("stop_hook_active"):
         return 0  # Claude is already continuing because of a stop hook; never loop
     session_id = str(payload.get("session_id", "unknown"))
     state = load_state(session_id)
+    if config.get("task_layout") == "files" and not ok and not state.get("index_blocked"):
+        state["index_blocked"] = True
+        save_state(session_id, state)
+        print(INDEX_BLOCK_REASON + problems[:2000], file=sys.stderr)
+        return 2
     started = state.get("started")
     if not isinstance(started, (int, float)):
         return 0  # no start marker (hook enabled mid-session): nothing to judge against
@@ -159,7 +198,7 @@ def main() -> int:
     workspace, config = found
     if sys.argv[1] == "session-start":
         return session_start(payload, workspace, config)
-    return stop(payload, workspace)
+    return stop(payload, workspace, config)
 
 
 if __name__ == "__main__":

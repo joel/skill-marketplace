@@ -68,7 +68,7 @@ Each fact lives once and is referenced from elsewhere. Do not maintain subtly di
 
 ## Machine-readable facts and the task backend
 
-`workspace.yaml` is a flat `key: value` file: `schema` (2), `agent` (the stable ID in `AGENTS.md`), `tasks` (`markdown` or `beads`), `hooks` (`on` or `off`). It is authoritative for tooling; when it and a prose file disagree, fix the prose. The validator errors when `agent` differs from `AGENTS.md`, or when a backend's files are present that `tasks` does not name. The task backend is chosen at init, recorded as a decision record, and described in [the task backends](task-backends.md).
+`workspace.yaml` is a flat `key: value` file: `schema` (2), `agent` (the stable ID in `AGENTS.md`), `tasks` (`markdown` or `beads`), `hooks` (`on` or `off`), and optionally `task_layout: files` (Markdown only: one file per task under `tasks/`, `TASKS.md` generated; see the task backends). It is authoritative for tooling; when it and a prose file disagree, fix the prose. The validator errors when `agent` differs from `AGENTS.md`, or when a backend's files are present that `tasks` does not name. The task backend is chosen at init, recorded as a decision record, and described in [the task backends](task-backends.md).
 
 ## Deterministic boot sequence
 
@@ -82,6 +82,14 @@ Each fact lives once and is referenced from elsewhere. Do not maintain subtly di
 6. Read the current monthly summary, when one exists.
 7. Read the latest session record; follow its Handoff to earlier records only when it points there. Reading all history is a boot-budget failure, not diligence.
 8. Open a session record before meaningful work.
+
+With `task_layout: files` the boot is scoped to the subject the owner names, so a session reads a few kilobytes instead of every task:
+
+- step 2 reads `memory-bank/activeContext.md` only; the other five files are read when the task touches what they cover, and all six on a cold start on a new machine or harness;
+- step 5 reads the generated `TASKS.md` (one line per task, overdue first), raises anything overdue, and opens only the named task's file, its `- Facts:` files and its `- Log:` when history matters;
+- step 7 reads the latest session record that names the task, or the latest overall when no task is named.
+
+Shared values used by two or more tasks (a phone line, an account, an address, a person, a card's last four digits) live once under `facts/`, one file per entity with `Status` and `Updated` lines, and tasks link to them. No secret values: the no-secrets rule applies there as everywhere.
 
 ## Authority baseline
 
