@@ -10,8 +10,8 @@ This plugin ships `hooks/hooks.json` and `hooks/vnw_hook.py`; they are active wh
 
 | Event | What the hook does |
 | --- | --- |
-| `SessionStart` | Injects a reminder of the boot sequence and of the session-record rule as additional context. For `tasks: beads` it also runs `bd prime` and injects its output, so the Beads workflow is in context from the first turn. Resume and compaction keep the original session start time. |
-| `Stop` | When no file under `sessions/` was created or modified since the session started, blocks **once** with the reason (write the session record, update the memory bank if anything moved, a no-work session gets a one-line record), then lets the next turn end. Honours `stop_hook_active`, so it never loops. When a record was written but no `memory-bank/` file changed, shows a one-time warning instead of blocking. |
+| `SessionStart` | Injects a reminder of the boot sequence and of the session-record rule as additional context. For `tasks: beads` it also runs `bd prime` and injects its output, so the Beads workflow is in context from the first turn. For `task_layout: files` it rebuilds `TASKS.md` from `tasks/*.md`, injects the index and uses the subject-scoped boot reminder. Resume and compaction keep the original session start time. |
+| `Stop` | For `task_layout: files`, first rebuilds `TASKS.md`, and blocks **once** when a task file breaks the contract, quoting the problems. Then, when no file under `sessions/` was created or modified since the session started, blocks **once** with the reason (write the session record, update the memory bank if anything moved, a no-work session gets a one-line record), then lets the next turn end. Honours `stop_hook_active`, so it never loops. When a record was written but no `memory-bank/` file changed, shows a one-time warning instead of blocking. |
 
 Per-session state (start time, whether it has blocked or warned) is kept outside the workspace, under `$CLAUDE_PLUGIN_DATA/hooks/` (or `$VNW_HOOK_STATE_DIR` in tests), so nothing hook-related is ever committed.
 

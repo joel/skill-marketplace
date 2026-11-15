@@ -72,5 +72,23 @@ class TaskIndex(unittest.TestCase):
         self.assertNotIn("T-0001", text.split("## Active")[1].split("## Known issues")[0])
 
 
+class ValidatorFilesLayout(unittest.TestCase):
+    def test_validator_checks_task_files_and_index_drift(self) -> None:
+        init = SCRIPT.with_name("init_workspace.py")
+        validate = SCRIPT.with_name("validate_workspace.py")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "ws"
+            subprocess.run([sys.executable, str(init), "--root", str(root), "--project", "X", "--apply"], check=True, capture_output=True)
+            (root / "TASKS.md").unlink()
+            config = root / "workspace.yaml"
+            config.write_text(config.read_text(encoding="utf-8") + "task_layout: files\n", encoding="utf-8")
+            (root / "tasks").mkdir()
+            (root / "tasks" / "T-0001.md").write_text(task("T-0001", status="doing"), encoding="utf-8")
+            out = subprocess.run([sys.executable, str(validate), "--root", str(root)], capture_output=True, text=True).stdout
+            self.assertIn("task T-0001: status 'doing' not in vocabulary", out)
+            self.assertIn("TASKS.md is stale", out)
+            self.assertIn("missing required file: TASKS.md", out)
+
+
 if __name__ == "__main__":
     unittest.main()

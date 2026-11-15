@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build TASKS.md as a generated index of per-task files under tasks/ (pilot, schema 2).
+"""Build TASKS.md as a generated index of per-task files under tasks/ (schema 2).
 
 Each task lives in tasks/<ID>.md with the task contract as `- Field: value` lines
 under a `# <ID> — <title>` heading, plus `#### Next action`. `- Kind: known-issue`
@@ -11,6 +11,11 @@ TASKS.md entries (fields, vocabulary, packet exists) are made here on tasks/*.md
 
     build_task_index.py --root .           # rewrite TASKS.md
     build_task_index.py --root . --check   # exit 1 if TASKS.md is stale or a task file is malformed
+    build_task_index.py --root . --split   # adopt: move TASKS.md entries into tasks/<ID>.md
+
+Declared by `task_layout: files` in workspace.yaml (with `tasks: markdown`). The
+Claude Code hook rebuilds the index at session start and at every turn end, so
+neither the owner nor the agent has to remember it.
 """
 
 from __future__ import annotations
@@ -109,21 +114,52 @@ def render(tasks: list[dict], today: str) -> str:
     return "\n".join(x.rstrip("\n") + "\n" for x in out)
 
 
+def build(root: Path, today: str) -> tuple[str, list[str]]:
+    """Return the index text and the contract errors found in tasks/*.md."""
+    errors: list[str] = []
+    if not (root / "tasks").is_dir():
+        return "", ["no tasks/ directory"]
+    return render(load(root, errors), today), errors
+
+
+def split(root: Path) -> int:
+    """One-off adoption: move each `### <ID>` entry of TASKS.md into tasks/<ID>.md (never overwrites)."""
+    source = root / "TASKS.md"
+    entries = re.split(r"(?m)^(?=### )", source.read_text(encoding="utf-8"))[1:]
+    (root / "tasks").mkdir(exist_ok=True)
+    written = 0
+    for block in entries:
+        block = re.split(r"(?m)^## ", block)[0]
+        tid = re.match(r"### (\S+)", block).group(1)
+        target = root / "tasks" / f"{tid}.md"
+        if target.exists():
+            print(f"skip {tid}: {target} exists", file=sys.stderr)
+            continue
+        body = "#" + block[3:]
+        for name, default in (("Area", "unknown"), ("Due", "none")):
+            if not field(body, name):
+                body = re.sub(r"(?m)^(- Evidence:.*)$", rf"\1\n- {name}: {default}", body, count=1)
+        target.write_text(body.rstrip() + "\n", encoding="utf-8")
+        written += 1
+    print(f"wrote {written} task files; set each '- Area:', then rebuild the index")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--root", required=True)
     ap.add_argument("--check", action="store_true", help="fail if TASKS.md differs from a fresh build")
+    ap.add_argument("--split", action="store_true", help="adopt: move TASKS.md entries into tasks/<ID>.md")
     ap.add_argument("--today", default=dt.date.today().isoformat(), help=argparse.SUPPRESS)
     args = ap.parse_args()
     root = Path(args.root)
-    errors: list[str] = []
-    if not (root / "tasks").is_dir():
-        print("ERROR: no tasks/ directory", file=sys.stderr)
-        return 1
-    tasks = load(root, errors)
-    text = render(tasks, args.today)
+    if args.split:
+        return split(root)
+    text, errors = build(root, args.today)
     for e in errors:
         print(f"ERROR: {e}", file=sys.stderr)
+    if not text:
+        return 1
     target = root / "TASKS.md"
     if args.check:
         current = target.read_text(encoding="utf-8") if target.exists() else ""
@@ -134,7 +170,7 @@ def main() -> int:
     if errors:
         return 1
     target.write_text(text, encoding="utf-8")
-    print(f"wrote TASKS.md: {len(tasks)} tasks, {len(text.encode())} bytes")
+    print(f"wrote TASKS.md: {text.count(chr(10) + '- [')} entries, {len(text.encode())} bytes")
     return 0
 
 
