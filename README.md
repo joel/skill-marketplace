@@ -447,6 +447,16 @@ what changed).
   itself, so press `Ctrl g` (locked mode) first when Claude Code needs them;
   `ctrl+x` is not bound by Zellij.
 
+### plan-implementation 2.11.0 (2026-11-24)
+
+References that link. Issues, PR bodies, review replies, QA notes and the
+closing summary write same-repository references as `#123`, other
+repositories as `owner/repo#123`, and external tracker keys as Markdown links.
+Committed files and outside trackers, where GitHub does not link `#123`, get
+full URLs. A body edit reads the current body first, because `--body` replaces
+it, and reads it back afterwards; a closing keyword is checked through
+`closingIssuesReferences`. Details in `references/write-for-the-reviewer.md`.
+
 ### plan-implementation 2.10.0 (2026-11-24)
 
 Outcome and failure tables. When an approved plan carries an outcome table and

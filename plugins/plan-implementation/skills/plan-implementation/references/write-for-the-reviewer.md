@@ -1,8 +1,8 @@
 # Write for the reviewer
 
 Loaded from the plan-implementation skill before writing the issue (Step 1), the PR
-description (Step 9), a review reply (Step 11) or the closing summary, and whenever a
-code comment is about to grow past a few lines.
+description (Step 9), a review reply (Step 11), the QA notes (Step 12) or the closing
+summary, and whenever a code comment is about to grow past a few lines.
 
 Reviewers report that AI-assisted pull requests take longer to read than hand-written
 ones: too many comments, write-ups that over-explain a small change, and
@@ -79,6 +79,28 @@ EOT
 ```
 
 Add the attribution footer your harness instructs.
+
+## References to issues, PRs and commits
+
+A reader follows a reference only when it links, and GitHub links some forms on its
+own but not others:
+
+- **Same repository:** `#123` for an issue or PR, a short sha for a commit. GitHub
+  links them in issues, PR bodies, comments and commit messages.
+- **Another repository:** `owner/repo#123` and `owner/repo@<sha>`. A bare `#123`
+  points at this repository's issue of that number.
+- **Closing keywords** (`Closes #123`) close the issue when the PR merges into the
+  default branch; an issue in another repository needs `Closes owner/repo#123`.
+- **An external tracker's key** is a Markdown link to the ticket, unless the
+  repository has an autolink reference set up for that prefix.
+- **Never linked:** a reference inside backticks or a code block, and any reference
+  in a committed file (docs, decision records, knowledge fragments), since GitHub
+  renders repository files without these links. There, write the full URL.
+- **Editing a body:** `gh pr edit --body` and `gh issue edit --body` replace the
+  whole body. Read it first (`gh pr view <PR> --json body --jq .body`), change that
+  text and write it back, so ticked checkboxes and other people's edits survive.
+- **Check:** after writing, read the body back; for a closing keyword,
+  `gh pr view <PR> --json closingIssuesReferences` must list the issue.
 
 ## Review replies (Step 11) and the closing summary
 
