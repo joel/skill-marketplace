@@ -16,7 +16,7 @@ description: >-
   own workflow doc. Do not engage for questions or read-only analysis; defer
   to a project-local skill with the same job when one exists.
 metadata:
-  version: "2.10.0"
+  version: "2.11.0"
   origin: "Genericised from a production Rails project's execution-plan skill"
 ---
 
@@ -136,8 +136,8 @@ AI-assisted PRs take longer to review when they over-comment or over-explain.
 Comments say what the code cannot (a constraint, a non-obvious *why*, an invariant),
 in one to three lines. Read the whole diff before pushing, as its first reviewer. The
 PR description stays under ~150 words of prose; review replies and the closing
-summary are a few lines each. Details and templates:
-[write-for-the-reviewer.md](references/write-for-the-reviewer.md).
+summary are a few lines each; issue, PR and commit references are written so they
+link. Details and templates: [write-for-the-reviewer.md](references/write-for-the-reviewer.md).
 
 ## Workflow steps
 

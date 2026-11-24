@@ -14,7 +14,9 @@ comment, or a field in the project's tracker. A project that sets QA notes to `n
 skips this step, and the closing summary says so.
 
 Write them last, from what shipped: the review loop can change behaviour after the PR
-opens.
+opens. Reference the issue and PR so they link
+([write-for-the-reviewer.md](write-for-the-reviewer.md)); a tracker outside GitHub
+does not link `#123`, so write the full URL there.
 
 ## Sources, in this order
 
