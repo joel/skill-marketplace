@@ -1,0 +1,44 @@
+# Acting on an approved plan
+
+Loaded from the plan-implementation skill (Design phase, "Already designed") when the
+run implements a plan approved before it started: a plan-mode plan, a plan file or
+design doc in the repository, or the plan in an issue body.
+
+## The plan of record
+
+Read the whole plan before Step 1. Its scope, non-goals, acceptance checks, baseline
+and stop conditions carry into the issue and the implementation. The user's current
+instructions win when they conflict; reconcile a substantive change with the user
+before going on.
+
+Reuse its design, evidence and file map, but check freshness first: compare the
+baseline it names with `origin/main` and inspect only the relevant differences. A
+newer commit alone does not invalidate a plan; a changed interface or requirement it
+relied on does, so replan that part.
+
+## When the plan records its own review
+
+Some planning processes review a plan before it is approved and keep a review log in
+it: the rounds run against a cap, and each finding with its disposition (fixed,
+incorrect, deferred, duplicate). Treat the log as part of the plan:
+
+- **Blocked.** The rounds reached the cap with a blocking finding still open: stop
+  and ask; do not implement from it.
+- **Required but missing.** When the project config says approved plans carry a
+  review log and this one has none, stop and ask. Otherwise a plan without a log is
+  normal, and the rest of this section does not apply.
+- **Known risks.** Accepted limitations and open disagreements go into the pre-mortem
+  answers and the PR's Notes: they are risks the reviewer must see.
+- **Deferred findings** go into the knowledge candidate log at Step 1 and become
+  follow-up issues at Step 15.
+- **Missed by plan review.** When an automated-reviewer finding (Step 10b) or a review
+  comment (Step 11) matches a log item dispositioned incorrect or deferred, list it in
+  the closing summary under **Missed by plan review**, with the log item and the
+  comment. That is how the plan review improves; when the planning process is itself
+  a skill, a proposal for it follows the skill-proposal route in
+  [knowledge-consolidation.md](knowledge-consolidation.md).
+
+## No gate is waived
+
+A reviewed plan does not replace this skill's pre-mortem, UX pass, code and security
+review, validation or live verification, and it does not change who merges.
