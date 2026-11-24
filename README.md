@@ -447,6 +447,18 @@ what changed).
   itself, so press `Ctrl g` (locked mode) first when Claude Code needs them;
   `ctrl+x` is not bound by Zellij.
 
+### plan-implementation 2.9.0 (2026-11-24)
+
+Acting on an approved plan. A plan approved before the run (plan mode, a plan
+file, an issue body) is the plan of record: its scope, acceptance checks and
+stop conditions carry into the work, after a freshness check against its
+baseline. When the plan keeps a review log, a blocking finding open at the
+round cap stops the run; accepted limitations and open disagreements go into
+the pre-mortem and the PR notes; deferred findings become follow-up issues; and
+a later review comment that matches a dismissed or deferred finding is reported
+as missed by the plan review. A project can require the log. No gate is waived.
+Details in `references/approved-plan.md`.
+
 ### plan-implementation 2.8.0 (2026-10-27)
 
 Live-verification pre-flight and performance measurements. Before the first

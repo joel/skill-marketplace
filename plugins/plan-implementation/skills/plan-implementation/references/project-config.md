@@ -17,6 +17,7 @@ template below in the first run and fill it from what you discover; mark unknown
 | Worktree setup | Step 4 | gitignored files to copy (`.env`, `config/local.yml`), install command (`bin/setup`, `npm ci`) |
 | Conventions doc | Step 5 | where real-time updates, boundaries, naming rules live |
 | Module boundary and type gates | Steps 5, 6 | commands that are merge-blocking but not run by the default test task |
+| Approved plans | Design phase | review log required (`yes`) or not (`no`, default) |
 | Seed task and reset command | Step 5b | `bin/rails db:seed`, `bin/reset` |
 | Security-review triggers | Step 5d | paths that count as auth, authz, tenancy, uploads, external calls |
 | Security model or review rubric doc | Step 5d | `doc/project/security-model.md` |
@@ -52,6 +53,7 @@ template below in the first run and fill it from what you discover; mark unknown
 - CI-only tests: <pattern>, treat local driver errors as environmental
 - Hooks: <framework>; skip one hook with `<syntax>`; never disable the framework
 - `[skip ci]`: <never | unnecessary | allowed for docs>
+- Approved plans: review log <required | not required>
 - Seeds: `<seed command>`; reset with `<reset command>`
 - Run app: `<start>` · rebuild `<rebuild>` · assets `<asset build>`
 - Dev login: <recipe or pointer>

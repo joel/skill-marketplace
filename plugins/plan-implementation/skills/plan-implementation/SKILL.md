@@ -16,7 +16,7 @@ description: >-
   own workflow doc. Do not engage for questions or read-only analysis; defer
   to a project-local skill with the same job when one exists.
 metadata:
-  version: "2.8.0"
+  version: "2.9.0"
   origin: "Genericised from a production Rails project's execution-plan skill"
 ---
 
@@ -81,14 +81,14 @@ governance here (issues, board, reviewer bot, releases). Invoke the agents inste
 
 - **Trivial** (one-line fix, copy or docs change, dependency bump, config tweak):
   skip the design agents. Go straight to issue → branch → commit.
-- **Already designed this session** (a plan-mode pass or equivalent exploration plus
-  a user-approved plan grounded in real code): do not re-run the explorer and
-  architect agents, and say so in the announce marker. Feed the existing findings
-  into the issue. This exemption does **not** waive the passes with their own
-  mandates: the customer-facing UI pass, the UX pass, and the pre-mortem still apply
-  when the work triggers them. "Already
-  covered" means the prior plan shows the pass itself, with its checklist walked,
-  not merely that design decisions were made. When in doubt, run the pass. It takes
+- **Already designed** (a plan-mode pass, or a user-approved plan handed in, grounded
+  in real code): do not re-run the explorer and architect agents, and say so in the
+  announce marker. Read the plan, and any review log it carries, first
+  ([approved-plan.md](references/approved-plan.md)); feed it into the issue. This
+  exemption does **not** waive the passes with their own mandates: the customer-facing
+  UI pass, the UX pass, and the pre-mortem still apply when the work triggers them.
+  "Already covered" means the prior plan shows the pass itself, with its checklist
+  walked, not merely that design decisions were made. When in doubt, run the pass. It takes
   minutes and the misses it catches otherwise cost review rounds.
 - **Feature, multi-file, or architectural** work: run the full design pass before
   writing the issue, so the issue's plan is grounded in real code:
