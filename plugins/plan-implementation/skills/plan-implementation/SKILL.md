@@ -16,7 +16,7 @@ description: >-
   own workflow doc. Do not engage for questions or read-only analysis; defer
   to a project-local skill with the same job when one exists.
 metadata:
-  version: "2.9.0"
+  version: "2.10.0"
   origin: "Genericised from a production Rails project's execution-plan skill"
 ---
 

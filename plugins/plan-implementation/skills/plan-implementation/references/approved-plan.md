@@ -23,7 +23,8 @@ it: the rounds run against a cap, and each finding with its disposition (fixed,
 incorrect, deferred, duplicate). Treat the log as part of the plan:
 
 - **Blocked.** The rounds reached the cap with a blocking finding still open: stop
-  and ask; do not implement from it.
+  and ask; do not implement from it. Extra rounds the developer approved past the
+  cap count as within it.
 - **Required but missing.** When the project config says approved plans carry a
   review log and this one has none, stop and ask. Otherwise a plan without a log is
   normal, and the rest of this section does not apply.
@@ -37,6 +38,14 @@ incorrect, deferred, duplicate). Treat the log as part of the plan:
   comment. That is how the plan review improves; when the planning process is itself
   a skill, a proposal for it follows the skill-proposal route in
   [knowledge-consolidation.md](knowledge-consolidation.md).
+
+## Outcome and failure tables
+
+A plan may carry an **outcome table** (each input or state and the result it must
+produce) and a **failure-at-each-step table** (each step, how it can fail, and what
+must happen then). Turn every outcome row into a test case, and every failure row
+into a test or a reason it cannot be tested, recorded in the PR's Notes. A table that
+reads `N/A: <reason>` needs no tests.
 
 ## No gate is waived
 
