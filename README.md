@@ -447,6 +447,14 @@ what changed).
   itself, so press `Ctrl g` (locked mode) first when Claude Code needs them;
   `ctrl+x` is not bound by Zellij.
 
+### plan-implementation 2.10.0 (2026-11-24)
+
+Outcome and failure tables. When an approved plan carries an outcome table and
+a failure-at-each-step table, every outcome row becomes a test case and every
+failure row a test or a reason it cannot be tested, recorded in the PR notes; a
+table marked `N/A: <reason>` needs none. Review rounds the developer approved
+past the cap count as within it. Details in `references/approved-plan.md`.
+
 ### plan-implementation 2.9.0 (2026-11-24)
 
 Acting on an approved plan. A plan approved before the run (plan mode, a plan
