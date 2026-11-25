@@ -16,7 +16,7 @@ description: >-
   own workflow doc. Do not engage for questions or read-only analysis; defer
   to a project-local skill with the same job when one exists.
 metadata:
-  version: "2.11.0"
+  version: "2.12.0"
   origin: "Genericised from a production Rails project's execution-plan skill"
 ---
 
@@ -144,13 +144,13 @@ link. Details and templates: [write-for-the-reviewer.md](references/write-for-th
 ### Step 1: Create the GitHub issue
 
 Before writing code, create an issue with a plan (`gh issue create`): the problem,
-the expected outcome, the scope and how to verify it. For feature work, base the scope
-on the explorer findings and the chosen architect blueprint. Body template in
+the expected outcome, the scope (from the design pass) and how to verify it. A run
+started from an issue (`#123`) reuses it, never a second one; a `## Plan` block in
+it names the plan ([approved-plan.md](references/approved-plan.md)). Body template in
 [write-for-the-reviewer.md](references/write-for-the-reviewer.md).
 
-Pick the label from the project's label set (typically `enhancement`, `bug`,
-`cleanup` or `refactor`, `documentation`). If the project keeps a per-effort audit
-log, open it now. See [audit-log.md](references/audit-log.md).
+Pick the label from the project's label set (`enhancement`, `bug`, `refactor`,
+`documentation`). If the project keeps a per-effort audit log, open it now ([audit-log.md](references/audit-log.md)).
 
 Start the **knowledge candidate log** now: a scratch file outside the checkout, one
 line per surprise (rule, why, evidence, status). Passes 1 and 2 consume it; see

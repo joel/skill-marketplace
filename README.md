@@ -88,6 +88,16 @@ forbids an entry without a directory.
 
 ## Release notes
 
+### plan-implementation 2.12.0 (2026-11-25)
+
+Starts from a plan-maker issue. A run started from `#123` works on that issue
+instead of opening a second one. When its body ends with a `## Plan` block, the
+plan is read at the commit the block's permalink pins and checked against its
+SHA-256, Plan ID and revision; a pending block, a mismatch or a blocked plan
+stops the run. The review-log rules now use plan-maker's words (`fix`,
+`incorrect`, `defer`, `duplicate`; `Rounds: N of M`; `### Outcome table`,
+`### Failure at each step`). Details in `references/approved-plan.md`.
+
 ### plan-maker 0.3.0 (2026-11-25)
 
 The plan validator. `scripts/validate_plan.py` checks a plan offline before it is
