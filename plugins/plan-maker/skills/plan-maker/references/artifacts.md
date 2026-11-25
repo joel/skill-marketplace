@@ -119,5 +119,5 @@ not run.
 Check artifact identity and revision, real issue numbers, complete required
 sections, a review log consistent with the rounds that ran, the plan hash against the committed bytes, the Plan block's permalink and
 pull request, no template slots, no secrets, and acceptance criteria that match the
-issue body. Then verify semantics, rendering, relations and the approved field
+issue body. Run the bundled validator where possible; then verify semantics, rendering, relations and the approved field
 changes separately.

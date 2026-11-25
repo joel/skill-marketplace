@@ -218,7 +218,7 @@ Open disagreements: None
 Prior revisions: None
 ```
 
-A reviewed plan carries the `Level` preamble field, this section, one
+The validator requires the `Level` preamble field, this section, one
 `Rounds: N of M` line (optionally `(+K approved by developer)`, with N at most
 M + K) and a round 1 row; a clean round still writes its row. At level 3 it also
-carries the two heavy tables.
+requires the two heavy tables.

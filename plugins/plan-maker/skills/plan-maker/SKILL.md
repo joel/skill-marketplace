@@ -279,6 +279,14 @@ only approved issues with a pending Plan block, resolve real issue numbers, comm
 the plans in their own worktree, open the docs-only pull request, read the plan
 bytes back at the commit, then set each issue's Plan block to the plan's permalink.
 
+Run `scripts/validate_plan.py <bundle-directory>` with Python 3.10+ on each plan
+before committing it, and `--published` on the bytes read back at the commit with
+the issue body read back (`issue.md`) before declaring publication verified. It
+checks structure, identity, the level, the review log, the Plan block and the plan
+hash, not GitHub permissions, rendering, semantics, approval or link reachability.
+Validate those separately. When Python is unavailable, report the missing check and
+apply the same checklist by hand.
+
 Read back issue bodies, fields, relations, the plan files at the commit and the
 pull request. Never equate a successful command with complete publication. Mark
 any partial work and retry only the missing, approved operations; never duplicate
@@ -300,3 +308,9 @@ approved scope and dependency order; a parent issue alone is not permission to
 implement all its sub-issues. If plan-implementation is unavailable, blocked by
 authentication or permissions, or the repository is incompatible, stop with the
 blocker. Never recreate its workflow as a fallback.
+
+## Maintainer checks
+
+`scripts/check.sh` at the marketplace root runs the validator's unit tests in the
+plugin's `tests/` directory. Use [behavioural scenarios](tests/scenarios.md) for live
+acceptance testing; do not load them for ordinary planning.
