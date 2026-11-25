@@ -131,11 +131,13 @@ use the host's permitted plan artifact. Never store secrets in the journal.
    pull-request convention.
 6. **Verify the bytes.** Read each plan back at the pushed commit (`gh api
    "repos/<owner>/<repo>/contents/<path>?ref=<sha>" --jq .content | base64 -d`),
-   compute its SHA-256, and compare it with the local file.
+   compute its SHA-256, and compare it with the local file. Save those bytes as
+   `plan.md` in a scratch bundle directory for step 7's check.
 7. **Link and mark current.** Apply the approved sub-issue and dependency relations,
    checking direction. Replace each pending Plan block with the current-plan block
    ([artifacts](artifacts.md)) pointing at the permalink, only after step 6
-   succeeded. Re-read the body and the relations. Never leave a "verified" block on
+   succeeded. Re-read the body and the relations, save the body as `issue.md`
+   beside the plan, and run `scripts/validate_plan.py <bundle> --published`. Never leave a "verified" block on
    a known-incomplete publication.
 8. **Merge per project policy.** When the project grants the agent merge authority,
    merge the plan pull request once its checks are green; otherwise stop at
