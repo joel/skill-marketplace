@@ -5,6 +5,7 @@
 Plan ID: {{STABLE_PLAN_ID}}
 Revision: {{POSITIVE_INTEGER}}
 Readiness: {{ready_or_blocked}}
+Level: {{PLANNING_LEVEL_1_2_OR_3}}
 Repository: {{VERIFIED_OWNER_AND_REPOSITORY}}
 Baseline: {{COMMIT_SHA_BRANCH_AND_DIRTY_TREE_TREATMENT}}
 Source: {{ISSUE_URL_AND_RELEVANT_REQUEST_OR_EVIDENCE}}
@@ -49,6 +50,16 @@ new files as new. State interface/schema/data implications or not applicable.}}
 {{Number criteria AC1, AC2, etc. Match the issue body. Distinguish local
 verifiability from integrated QA requiring another issue.}}
 
+### Outcome table
+
+{{Level 3 only; delete this subsection at levels 1 and 2. One row per distinct
+outcome, not per combination, or `N/A: <reason>`. Each row is an acceptance
+criterion plan-implementation turns into a test.}}
+
+| ID | Input | Existing state | Expected result |
+|---|---|---|---|
+| {{AC_ID}} | {{input or action}} | {{relevant existing state}} | {{expected result}} |
+
 ## QA scenarios
 
 {{Start with the quick check: the fastest path that proves the change works, and
@@ -76,6 +87,31 @@ rollback boundaries and data consequences; or not applicable with a reason.}}
 {{Relevant authorization and tenant isolation, concurrency, ordering, retries,
 idempotency, external system failure, data loss, security or UI-state risks. State
 what halts execution and which unknowns cannot safely be assumed away.}}
+
+### Failure at each step
+
+{{Level 3 only; delete this subsection at levels 1 and 2. One row per
+implementation step that can fail, keyed to its step number; the written form of
+the pre-mortem answers. Or `N/A: <reason>`.}}
+
+| Step | What fails | What the system does | State left behind |
+|---|---|---|---|
+| {{STEP_NUMBER}} | {{failure}} | {{handled behaviour}} | {{persisted state}} |
+
+## Review log
+
+Level: {{PLANNING_LEVEL_1_2_OR_3}} ({{light, standard or heavy}}); {{chosen by developer or set by argument}}
+Level proposals: {{None, or one line each: signal or none matched, evidence; developer kept N or switched N -> M}}
+Rounds: {{ROUNDS_RUN}} of {{ROUND_CAP}}{{ (+K approved by developer) when past the cap}}; outcome: {{clean at round N, accepted at cap by developer, or blocked}}
+Reviewers: {{plan-maker:plan-reviewer (model, effort) and the lenses per round, or the disclosed fallback}}
+
+| Round | Lens | ID | Severity | Finding | Disposition | Section |
+|---|---|---|---|---|---|---|
+| 1 | {{LENS}} | {{FINDING_ID}} | {{blocking, material or minor}} | {{one-line finding}} | {{fix; incorrect: evidence; defer: reason; or duplicate ID}} | {{plan section}} |
+
+Accepted limitations: {{None, or each with its reason and who accepted it}}
+Open disagreements: {{None, or each re-raised finding with both sides' evidence}}
+Prior revisions: {{None, or one line per earlier revision: revision, level, rounds, outcome}}
 
 ## Execution handoff
 

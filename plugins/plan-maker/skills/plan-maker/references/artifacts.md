@@ -27,7 +27,8 @@ omission. Planned new paths are proposals, not evidence that a file already exis
 
 Each plan is one file, `<plans directory>/<issue>-<slug>.md` (default
 `docs/plans/`; [project configuration](project-config.md)). Record one Plan ID, an
-integer revision, the issue number, repository, baseline and state. Use
+integer revision, the issue number, repository, baseline, state and planning
+`Level`. Use
 `Readiness: ready` only when no blocking prerequisite remains; otherwise use
 `Readiness: blocked` and name how to unblock it. Record the exact source and the
 user's assignee and milestone decisions, including explicit none or keep-current.
@@ -41,7 +42,21 @@ conditions. Reference relevant repository instructions instead of copying them.
 Describe local verification even when user-facing QA needs another issue; identify
 the integrated journey and the prerequisite issues for the latter. Seed the QA
 scenarios that plan-implementation turns into the QA notes at handoff: journeys,
-data that exposes a regression, and expected results.
+data that exposes a regression, and expected results. Record every review round in
+`## Review log` ([format](review-loop.md)); its accepted limitations and open
+disagreements are part of the plan the executor reads.
+
+At level 3 the plan also carries two tables ([level rules](levels.md)), in the
+template's H3 slots:
+
+- `### Outcome table` under `## Acceptance criteria`: `ID | Input | Existing
+  state | Expected result`, one row per distinct outcome rather than every
+  combination. Each row is an acceptance criterion with its own ID, so
+  plan-implementation can turn it into a test.
+- `### Failure at each step` under `## Risks and stop conditions`: `Step | What
+  fails | What the system does | State left behind`, keyed to the step numbers.
+
+Either may read `N/A: <reason>`. At levels 1 and 2, delete the two subsections.
 
 Commands must be grounded in the checkout or labelled proposed/unverified. State
 working directory, environment and expected evidence. Put any destructive or
@@ -62,7 +77,7 @@ implementation guidance.
 End the issue body with a small `## Plan` block. It is the current-plan pointer:
 
 ```text
-Plan <Plan ID>, revision <N>. Publication verified; implementation not authorized.
+Plan <Plan ID>, revision <N>, level <L>. Publication verified; implementation not authorized.
 Complete plan: <permalink: https://github.com/<owner>/<repo>/blob/<commit sha>/<path>>; SHA-256 <hash>.
 Plan pull request: #<PR>.
 Implementation, on explicit request only: /plan-implementation #<issue>.
@@ -102,7 +117,7 @@ not run.
 ## Final quality gate
 
 Check artifact identity and revision, real issue numbers, complete required
-sections, the plan hash against the committed bytes, the Plan block's permalink and
+sections, a review log consistent with the rounds that ran, the plan hash against the committed bytes, the Plan block's permalink and
 pull request, no template slots, no secrets, and acceptance criteria that match the
 issue body. Then verify semantics, rendering, relations and the approved field
 changes separately.

@@ -38,12 +38,12 @@
     },
     {
       "name": "plan-maker",
-      "description": "Plans code work in a GitHub repository without implementing it: focused read-only research, clarified requirements, right-sized GitHub issues, one publication approval, then concise issues and a complete plan per issue committed to the plans directory through a docs-only pull request, verified, then stop. Implementation requests hand off to plan-implementation with the issue number.",
+      "description": "Plans code work in a GitHub repository without implementing it: three planning levels, focused read-only research, an independent plan review loop with fresh read-only reviewers, right-sized GitHub issues, one publication approval, then concise issues and a complete plan per issue committed to the plans directory through a docs-only pull request, verified, then stop. Implementation requests hand off to plan-implementation with the issue number.",
       "author": {
         "name": "Joel Azemar"
       },
       "category": "workflow",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/joel/skill-marketplace.git",

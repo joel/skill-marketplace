@@ -2,7 +2,7 @@
 
 ## State machine
 
-`RESEARCH -> PUBLISH -> VERIFY -> STOP`
+`RESEARCH -> REVIEW -> PUBLISH -> VERIFY -> STOP`
 
 Only a **new explicit user implementation request after verified publication** can
 move from STOP to `HANDOFF /plan-implementation #<issue>`. Never enter
@@ -14,7 +14,8 @@ Publication approval permits only the displayed issue operations, the plan commi
 and its docs-only pull request, approved visuals, and verification. It is not
 approval to edit code, create an implementation branch, move an issue on a board, or
 run a test suite. Accepting a host permission prompt does not expand the agreed
-scope. A later material change to the payload reopens the approval.
+scope. The wrapper runs no further review rounds after approval; a later material
+change to the payload reopens both the approval and the loop.
 
 ## Native saved-plan wrapper
 
@@ -39,6 +40,7 @@ reviewed proposal. No references to transient sub-agent transcripts.
 - Plan/run IDs: <stable IDs for deduplication and resuming>
 - GitHub capabilities and blockers: <verified state, no credentials>
 - Assignee and milestone choices: <explicit per-issue decisions>
+- Review loop: <level, round N of cap (+K approved by developer), last verdict, open IDs, accepted limitations>
 
 ## Executable publication steps
 1. Resume plan-maker and recheck approved targets for intervening changes.

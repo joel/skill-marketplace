@@ -7,6 +7,7 @@
 | Entry points, similar code, tests in one area | Read-only Explore/Plan; available feature-dev:code-explorer | A bounded evidence brief |
 | Independent backend, UI, integration areas | Up to three agents with disjoint scopes | One brief each, shared interface questions |
 | A consequential design choice | One available feature-dev:code-architect or Plan | One recommended design, alternatives and tradeoffs |
+| Plan review loop (section 4a) | `plan-maker:plan-reviewer`, one fresh agent per lens and round, never a fork; effort per level | Severity-ranked findings with evidence; see [the review loop](review-loop.md) |
 
 Do not delegate an obvious one-file lookup or start a design tournament for a simple
 bug. Do not use implementation or validation agents to execute the proposed work. No
