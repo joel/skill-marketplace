@@ -11,6 +11,7 @@ Marketplace name: `joel-skills`. Catalog: `.claude-plugin/marketplace.json`.
 |--------|--------------|
 | `vendor-neutral-workspace` | Initialise, adopt, maintain, audit, or hand over a vendor-neutral workspace. The repository's files, not any provider's chat history or hidden memory, are the durable record of an AI agent's work, so the same subject resumes from another machine or another harness (Claude Code, Codex, Cursor, OpenCode). One agent by default, `AGENTS.md` carrying the boot sequence; context in the six Memory Bank files; decisions as MADR 4.0 records in `docs/decisions/`; tasks in a Markdown file or in Beads, declared in `workspace.yaml`; session records, summaries and approval packets beside them. Ships the standard, the template, scripts to create, validate and migrate (v1 → v2) a workspace, and Claude Code hooks that block ending a session without its record. |
 | `plan-implementation` | Drives any piece of code work through a full lifecycle: size-scaled design pass, GitHub issue, Kanban, branch, implement, seed data, internal code and security review loops, validation gates, atomic commits, live verification in a real browser, docs and diagrams, PR, automated-reviewer loop, review-thread triage, merge per project policy, optional release, and persisting what was learned. Generic: each project supplies its own repo, board, commands, gates, reviewer bot, and merge policy through its workflow doc. |
+| `plan-maker` | Plans a piece of code work without implementing it. Researches the checkout read-only, questions the requirements, proposes right-sized GitHub issues, then asks for one approval before it writes anything. After approval it creates or updates concise issues and commits a complete plan per issue to `docs/plans/` through a docs-only pull request, pointing each issue at its plan's permalink. It never implements: "implement #123" afterwards goes to `plan-implementation`, which it depends on and Claude Code installs with it. Generic: plans directory, issue types, planning fields and merge policy come from the project's workflow doc. See [plan-maker 0.1.0](#plan-maker-010-2026-11-25). |
 | `prompt-debias` | Rewrites a draft prompt before you send it so the answering model cannot silently inherit your frames. Models refute what you assert but inherit what you assume. The skill inventories every injected frame, keeps real constraints and evidence, quarantines the rest as hypotheses to test, states the question neutrally, and adds instructions that force competing framings and odds-backed conclusions. Returns the rewritten prompt plus a table of what changed. Inspired by [Techintrospect's AI Bullshit Fixer](https://techintrospect.substack.com/p/ai-bullshit-fixer-prompt). |
 | `joel-tone` | Rewrites drafts, emails, Slack messages, proposals, or LLM-generated copy into Joel's voice so they read like a careful human wrote them. Picks the register first (public Vogon Partners copy or Joel's own messages), then applies the hard rules: no em or en dashes, no invented facts, no empty intensifiers, no filled-template rhythm. Ships the public-website voice brief as a reference. Returns paste-ready text plus a short note on what changed and what to check. |
 | `helper-desk` | A Claude Code mod (a hooks module, not a skill) by [Ben AI](https://www.benai.co), redistributed with permission. A purple task bar above the prompt fills as Claude ticks off its plan, and the Helper Desk pane shows one live card per subagent: its current step, tokens, time and a progress bar. In Zellij, the pane and its floating window take the colours of your Zellij theme. Registers a `plan` tool and `/helpers`, and adds a short system-prompt section plus plan nudges to every session while it is enabled. Built and tested on Claude Code 2.1.311 (upstream 0.4.0 needed 2.1.287 or newer). See [helper-desk 0.8.3](#helper-desk-083-2026-11-13). |
@@ -86,6 +87,20 @@ allowed), and it is the only PR that bumps the version. A rename cannot land on
 forbids an entry without a directory.
 
 ## Release notes
+
+### plan-maker 0.1.0 (2026-11-25)
+
+A planning skill, `/plan-maker`, for any GitHub repository. It researches with
+read-only sub-agents, clarifies material unknowns, and proposes one GitHub issue
+per deliverable (a parent with sub-issues for a coordinated set, blocked-by
+relations between peers). One approval covers everything it then writes: the
+issues, with the repository's issue templates applied, and one plan file per
+issue in `docs/plans/`, committed in its own worktree and opened as a docs-only
+pull request. Each issue ends with a Plan block pointing to its plan's permalink,
+revision and SHA-256, read back before it is marked verified. It never edits
+application code or moves an issue; "implement #123" afterwards goes to
+`plan-implementation`. Requires `plan-implementation` (installed with it; with
+`--plugin-dir`, load both).
 
 ### usage-left 0.3.0 (2026-11-13)
 
