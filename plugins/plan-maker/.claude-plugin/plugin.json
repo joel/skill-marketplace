@@ -1,0 +1,18 @@
+{
+  "name": "plan-maker",
+  "description": "Plans code work in a GitHub repository without implementing it: focused read-only research, clarified requirements, right-sized GitHub issues, one publication approval, then concise issues and a complete plan per issue committed to the plans directory through a docs-only pull request, verified, then stop. Implementation requests hand off to plan-implementation with the issue number.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Joel Azemar"
+  },
+  "repository": "https://github.com/joel/skill-marketplace",
+  "keywords": [
+    "planning",
+    "github",
+    "issues",
+    "workflow"
+  ],
+  "dependencies": [
+    "plan-implementation"
+  ]
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plan Maker"
+  short_description: "Research and publish GitHub issue plans without implementing"
+  default_prompt: "Use plan-maker to research this request, review the plan with me, then publish the approved GitHub issues and commit their plans in a docs-only pull request, without implementing."
