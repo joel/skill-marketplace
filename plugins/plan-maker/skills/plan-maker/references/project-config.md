@@ -13,6 +13,7 @@ values below; every one has a default, so neither block is required.
 | Plan branch | Section 6 | `docs/plans-<issue>-<slug>` |
 | Issue types or labels per outcome | Section 4 | the repository's issue types, else its labels |
 | Assignee, milestone and iteration | Section 2 | asked every run; milestone and iteration skipped when the project uses neither |
+| Risk signals | Sections 2, 3 | the list in `levels.md`; a project may add paths or areas |
 | Docs-only pull request convention | Section 6 | ordinary review; the project's own rule for docs PRs that run no checks |
 | Merge policy (shared) | Section 6 | `human`: stop at PR-ready |
 
@@ -25,6 +26,7 @@ values below; every one has a default, so neither block is required.
 - Plan branch: docs/plans-<issue>-<slug>
 - Issue types: Bug for defects, Task for technical work, Feature for user-facing outcomes
 - Planning fields: assignee; milestone <used | not used>; iteration <field name | not used>
+- Risk signals, in addition to levels.md: <paths or areas, for example src/billing/>
 - Docs-only pull requests: <ordinary review | admin merge when no checks run>
 ```
 

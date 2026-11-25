@@ -4,8 +4,11 @@ description: >-
   Plan a piece of code work in the current GitHub repository without
   implementing it. Use on /plan-maker with free-text instructions, findings,
   an issue number or URL, or a request to investigate and publish a
-  GitHub-issue-backed plan. Research read-only, clarify material unknowns,
-  propose right-sized issues, obtain one publication approval, then create or
+  GitHub-issue-backed plan. Ask which planning level applies (light,
+  standard, heavy) unless given, scale research to it, clarify material
+  unknowns, run an independent review loop with fresh read-only reviewer
+  agents until the plan converges, propose right-sized issues, obtain one
+  publication approval, then create or
   update concise GitHub issues and commit each issue's complete plan to the
   repository's plans directory through a docs-only pull request. Never treat
   planning or publication approval as a request to implement; hand
@@ -19,7 +22,7 @@ description: >-
 
 Print this marker once when engaging:
 
-> **USING PLAN MAKER** | research -> clarify -> draft -> approve -> publish -> verify -> stop; no implementation
+> **USING PLAN MAKER** | level -> research -> clarify -> draft -> review loop -> approve -> publish -> verify -> stop; no implementation
 
 Treat the invocation arguments as the request: `$ARGUMENTS`. In a host without
 argument substitution, use the user's supplied instructions.
@@ -103,8 +106,21 @@ permission to edit it; show create/update/reuse/no-change choices in the preview
 Use pull requests only as explicitly supplied evidence, not a new PR-review
 workflow.
 
-Ask one grouped question for missing planning decisions, not facts discoverable
-in code or GitHub. Always establish **assignee and milestone** before publication,
+The developer chooses the **planning level** before research, with
+[the level rules](references/levels.md). `--level 1|2|3` anywhere in the
+arguments, or a leading `light`, `standard` or `heavy`, sets it; say so.
+Otherwise the level joins the grouped question below: three options in order,
+none marked as recommended and none guessed from the request, each stating what
+it runs as `levels.md` defines. Once known, print
+`> plan-maker level N (<name>): <lenses>, cap <M>`. The session effort is
+`${CLAUDE_EFFORT}`: if it is below the level's recommended session effort in
+`levels.md`, say so once and name `/effort`; if it is not substituted, skip the
+check. Never change the level on your own: when a risk signal or its absence shows
+the level does not fit, make a level proposal as `levels.md` describes and let the
+developer decide.
+
+Ask one grouped question for missing planning decisions (level, assignee,
+milestone), not facts discoverable in code or GitHub. Always establish **assignee and milestone** before publication,
 and the board iteration when the project plans in iterations: a login (verified
 assignable), unassigned, or keep current for updates; an open milestone or
 iteration, none, or keep current. Skip what the project does not use. Do not
@@ -120,7 +136,10 @@ nontrivial area-specific search, delegate to an available read-only `Explore` or
 `feature-dev:code-explorer` if available and suitable. Give each a distinct bounded
 question, the relevant instructions, and a compact evidence return contract.
 
-Scale the search to the work. Do not run every specialist for every task. Use the
+Scale the search to the level, as `levels.md` sets it. Do not run every
+specialist for every task. When research ends, check the files the plan will touch
+against the risk signals in `levels.md` and make a level proposal when the chosen
+level does not fit, before clarifying. Use the
 project's frontend or design-system docs for UI planning without beginning their
 implementation workflows. Warn and use bounded direct reads if delegation is
 unavailable; never claim it occurred.
@@ -140,6 +159,10 @@ requirements and double-check for blind spots to avoid assumptions and guesses.
   unverified assumptions, conflicting evidence and unspecified constraints.
 - Challenge the proposed approach yourself: edge cases, dependencies, failure
   modes, integration boundaries, alternative readings, unintended consequences.
+  The review loop in 4a repeats this challenge with fresh eyes; findings there that
+  need a user decision re-enter this step. At level 3, answer the five pre-mortem
+  questions in [the level rules](references/levels.md) under Risks; they fill the
+  failure-at-each-step table.
 - Separate verified facts from hypotheses and decisions requiring user input.
   Resolve discoverable facts through read-only research rather than asking the
   user.
@@ -180,12 +203,49 @@ Read [the artifact contract](references/artifacts.md). Use:
 - [Plan template](assets/plan.md): issue-scoped evidence, decisions, ordered steps,
   files, acceptance, exact verification commands and expected results,
   dependencies, risks, rollout and rollback, and the execution handoff. Mark
-  unsupported details as unknown; never manufacture evidence or passing tests.
+  unsupported details as unknown; never manufacture evidence or passing tests. At
+  level 3, fill its outcome table and failure-at-each-step table, or write
+  `N/A: <reason>` in either.
 
 Keep every plan self-contained for its scope. For a parent issue, define
 coordination, child outcomes, dependency order and integrated acceptance, not
 duplicated child implementation. Mark an unresolved prerequisite plan `blocked`
 with an owner and a concrete unblock condition.
+
+## 4a. Run the plan review loop
+
+Read [the review loop](references/review-loop.md). Round 1 runs at every level,
+before any preview; nothing here is skipped silently.
+
+Each round sends the current `plan.md` (its review log reduced to the level and
+accepted limitations), the issue body, repository root and baseline to fresh
+reviewers, one per lens for the level, as `plan-maker:plan-reviewer` agents with
+the lenses, model and `effort` that `levels.md` sets for the level. Never a fork or
+a continued agent: reviewers stand in for the executor, who will not have this
+conversation either. Reviewers verify every claim in the checkout and return
+severity-ranked findings with evidence; `unverified` evidence caps a finding at
+minor.
+
+Triage every finding with exactly one disposition: fix (after re-reading the cited
+range), incorrect (only with evidence you re-read now), defer (named, with reason,
+under Risks or Out of scope) or duplicate. Blocking is never deferred without the
+user. A round is **clean** only when the reviewers raised no blocking or material
+finding; dismissing them all does not make it clean. A claim dismissed as incorrect
+that a fresh reviewer raises again is fixed or shown to the user as an open
+disagreement, never dismissed twice.
+
+Stop at the first clean round at every level. A revision changed by fixes always
+gets another round; the plan presented in section 5 is the one that passed its last
+round. The level's cap is soft: at the cap with open blocking or material findings,
+ask the developer before each extra round, as the review loop describes: run one
+more round, accept them as named limitations, or publish as `Readiness: blocked`.
+Re-run at least one round after answers that change scope, after a material edit
+following the preview (which also reopens approval), on every update-mode revision,
+and when the baseline moved under cited files.
+
+Record every round in the plan's `## Review log`; it is the resume state after a
+compaction. If the Agent tool is unavailable, run a disclosed self-review, log
+`Reviewers: none`, and say in the preview that no independent review ran.
 
 ## 5. Present one publication approval
 
@@ -193,7 +253,9 @@ Present the proposed issue breakdown, create/update/reuse operations, issue bodi
 readable complete plans and their file paths, the plan branch and pull request,
 blockers, relations, assignees and milestones. For existing issues, show the
 meaningful before/after changes. Expose the complete plan for review, not only a
-summary.
+summary. Summarize the review log: level, rounds, findings fixed, incorrect and
+deferred, accepted limitations and open disagreements; say plainly when no
+independent review ran.
 
 Ask: **"Approve publishing these GitHub issues and committing these plans in a
 docs-only pull request? This does not authorize implementation."** Use the native
